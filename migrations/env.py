@@ -17,9 +17,10 @@ if not database_url:
     raise RuntimeError("DATABASE_URL must be set in the environment to run Alembic")
 config.set_main_option("sqlalchemy.url", database_url)
 
-# target_metadata = Base.metadata once models land in phase 03; until then
-# autogenerate has nothing to compare against and that's intentional.
-target_metadata = None
+import app.models  # noqa: E402, F401 — re-exports register every model on Base.metadata
+from app.db.base import Base  # noqa: E402
+
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:

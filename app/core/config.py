@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,9 @@ class Settings(BaseSettings):
     database_url: str
     env: Literal["dev", "test", "prod"] = "dev"
     log_level: str = "INFO"
+
+    jwt_secret: SecretStr
+    jwt_expires_days: int = 30
 
 
 @lru_cache

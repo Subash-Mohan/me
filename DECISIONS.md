@@ -161,3 +161,131 @@ Append-only log of implementer judgment calls. Never edit a past entry — super
 - Deleting `tests/test_health.py` (vs. `@pytest.mark.skip`) was the user's explicit pick. Skip-marked tests show up in pytest output as a permanent yellow noise floor; deletion keeps the test suite honest about what's actually running.
 **Re-introducing it later (CI phase, currently planned for phase 15):** restore an autouse session-scoped fixture that creates `me_test` if absent (the implementation in the superseded entry is a fine starting point), bring back `db_engine` + `db_session`, restore `test_db_session_round_trips`, restore a `tests/test_health.py` that uses `TestClient` and asserts the DB-up body. At that point also evaluate whether the lifespan startup probe should run during tests — likely yes, via `with TestClient(app) as client:` — which would require the test DB to be reachable for *every* test, not just DB-touching ones. That trade-off is for the CI phase to make.
 **Alternatives considered:** keep the fixtures but `pytest.mark.skip` the DB-touching tests (rejected by user — visible noise floor); keep the fixtures but skip them via env-var gate (`SKIP_DB_TESTS=1`) (rejected — same noise plus a config knob nobody will remember); point the test DB at the dev `me` database to avoid provisioning (rejected — tests would mutate the dev DB).
+
+---
+
+## 2026-05-02 — Phase 04 auth: passphrase + JWT, no signup, no email
+**Choice:** Single-user passphrase auth. The `users` table has exactly one row (`id`, `passphrase_hash`, `created_at`, `updated_at`) — **no email column**, no other identifier. Login takes only `{passphrase}`, returns a 30-day HS256 JWT. The user is seeded at lifespan startup from `OWNER_PASSPHRASE` env using `INSERT ... WHERE NOT EXISTS` (idempotent). `OWNER_PASSPHRASE` is required only on first boot; once the row exists it's ignored, and rotating the passphrase is an out-of-band DB update for now.
+**Why:**
+- The app is single-user — there is no concept of "which user" to disambiguate, so the email column was dead weight that would have just confused future code.
+- Passphrase rather than a static bearer token: the user wanted to type something memorable instead of pasting a secret blob.
+- 30-day JWT with no refresh / no signout / no denylist: keeps the surface area minimal. Rotation = bump `JWT_SECRET` env var (invalidates all prior tokens at once).
+- Step-up auth (see next entry) carries the security weight that a bearer-token leak otherwise would.
+**Endpoints shipped:** `POST /auth/login`, `GET /auth/me`, `POST /auth/verify-passphrase`. **Deliberately omitted:** signup, refresh, signout, password-reset, device-ID tracking, email-validator dep.
+**Dependency additions:** `argon2-cffi>=23.1` (hashing), `pyjwt>=2.8` (JWT), `slowapi>=0.1.9` (installed but not used — a custom `FailureRateLimiter` was simpler than slowapi's success-counting model). slowapi can be removed when phase 05 lands; left in for now in case a per-route limiter is wanted somewhere it isn't a failure counter.
+**Alternatives considered:**
+- Multi-user signup/signin per the original phase doc — rejected as ceremony for a world that doesn't exist (single user).
+- Static bearer token (no passphrase) — rejected because the user wanted to type something memorable.
+- "Sign in with Google" OAuth — rejected as adding an external dependency for what is, in the end, the user signing in to their own app.
+- Wallet-style signed-request auth (BIP39 phrase derives ed25519 key, no shared secret on server) — discussed in detail; rejected because the user dismissed mobile-compromise threats and prioritised simplicity. Step-up auth (next entry) was the targeted defence chosen instead.
+
+---
+
+## 2026-05-02 — Step-up auth for destructive actions (`X-Confirm-Passphrase`)
+**Choice:** A `confirm_passphrase()` FastAPI dependency in `app/core/security.py` reads the passphrase from the `X-Confirm-Passphrase` header and verifies it against the user's Argon2id hash. Phase 04 ships the dep + `POST /auth/verify-passphrase` to exercise the same primitive in body form. Future delete-style endpoints in phases 05+ (delete memory, delete entry, delete image, delete account) add `Depends(confirm_passphrase)` alongside `Depends(current_user)`.
+**Why:**
+- Limits the blast radius of JWT theft. A JWT pulled from a jailbroken / stolen device can read and write through the chat flow but cannot delete data, because the passphrase is never persisted on the device — it's typed at login and again at each destructive action.
+- Header rather than body for the dep: the dep is reusable across any route shape (DELETE without body, etc.). `X-Confirm-Passphrase` is the conventional naming despite the deprecated `X-` prefix (RFC 6648); structlog config never logs request headers, so the passphrase stays out of normal logging.
+- `verify-passphrase` endpoint exists so mobile can validate the typed passphrase *before* showing a delete-confirm UI (avoids "type wrong → watch delete fail → start over").
+**Failures count toward the same rate-limit budget as `/auth/login`** (see next entry).
+**Alternatives considered:**
+- Body parameter on every delete endpoint — rejected, awkward for DELETE without body and forces every route to repeat the same plumbing.
+- Re-issued short-lived "step-up token" model (à la sudo timeout) — rejected as overengineered for a single-user app where re-typing the passphrase is the whole point.
+
+---
+
+## 2026-05-02 — Auth rate limiting: in-memory `FailureRateLimiter`, no slowapi
+**Choice:** A custom `FailureRateLimiter` (`app/core/rate_limit.py`) implements two sliding-window failure counters, both in-memory, both shared across `/auth/login`, `/auth/verify-passphrase`, and the `confirm_passphrase` dep:
+- **Per-IP:** 5 failures per 60s window.
+- **Per-user (global):** 100 failures per 24h window. (For a single-user app this is effectively the same as a global counter; left explicit in case the model ever expands.)
+
+Successful auth does **not** increment the counter. Client IP comes from `X-Forwarded-For` (first hop) when present, else `request.client.host` — fine for Fly's edge proxy in prod and trivially testable from `TestClient` via the header in tests.
+**Why:**
+- slowapi was added to deps but ultimately not used: its model counts *all* requests to a route, not failures, so adapting it to "5 failures per minute" required as much custom code as just rolling a small counter (~50 lines including tests). Kept slowapi in deps for now in case a non-failure-counted limiter is wanted in a future phase; remove if still unused after phase 05.
+- Sliding-window counters with a `Callable[[], float]` clock: makes the threshold and window-expiry tests fast and deterministic without sleeping.
+- Pluggable via `Depends(get_auth_limiter)`: tests use a session-scoped fixture that auto-resets the singleton between tests so per-IP counters don't leak across the suite.
+**Single-process scope:** the in-memory counter only protects one process's traffic. When Fly machines scale beyond one, we'll need a Redis or DB-backed counter. Not worth optimising for now — flagged here so we don't forget.
+**Alternatives considered:**
+- slowapi's `Limiter.limit()` with a custom storage backend — rejected as more code for a worse fit (success-counting model).
+- Redis-backed counter from day one — rejected, single-process is the deployment shape for now.
+- Per-route limits (different threshold per endpoint) — rejected, the budget is shared on purpose so an attacker can't burn through the budget on one endpoint and try the others.
+
+---
+
+## 2026-05-02 — Phase 04 auth: drop the rate limiter
+**Choice:** Remove `app/core/rate_limit.py`, the `FailureRateLimiter` integration in `/auth/login`, `/auth/verify-passphrase`, and `confirm_passphrase`, the autouse reset fixture in `tests/conftest.py`, the `slowapi` dependency, and the rate-limit test files (`tests/unit/test_rate_limit.py`, `tests/api/test_auth_rate_limit.py`).
+**Supersedes:** the immediately-preceding 2026-05-02 entry "Auth rate limiting: in-memory `FailureRateLimiter`, no slowapi".
+**Why:**
+- User's call: "for single user app it's overkill." For a single-user app the threat model that rate limiting addresses (online password spray) doesn't apply in any meaningful way — the only legitimate caller is the user themselves, and the passphrase entropy + Argon2id cost already make brute force infeasible at any plausible request rate.
+- Real DDoS protection lives at Fly's edge proxy in prod, not in-process. Keeping in-app rate limiting "just in case" was carrying ~150 lines of code and an autouse fixture for no real defensive value.
+- Failed auth events are still logged (`auth.login_fail` / `auth.verify_fail` with IP) so anomaly detection remains possible via log search.
+**What was kept:** `client_ip()` extractor in `app/core/security.py` (still useful for log enrichment), all auth event logging.
+**Re-introducing it later:** the prior commit (visible in git history) has the full `FailureRateLimiter` implementation and tests; restore from there if a future deployment shape (e.g. exposing the API more broadly than a single mobile client) makes it relevant again.
+**Alternatives considered:** keep the limiter but raise thresholds (rejected — same code, same fixture, same complexity, no behaviour worth keeping); only remove the per-user counter and keep per-IP (rejected — both are equally overkill at this scale).
+
+---
+
+## 2026-05-02 — Owner created via CLI, not via env+lifespan
+**Choice:** The owner user is created out-of-band via a small CLI:
+
+```
+uv run python -m app.cli create-owner            # prompts twice with no echo (getpass)
+uv run python -m app.cli create-owner "phrase"   # arg form (avoid in shell history)
+```
+
+Lifespan no longer seeds anything; it just runs the DB-reachability probe (per the phase-02 entry). `OWNER_PASSPHRASE` is removed from `Settings`, `.env.example`, and `tests/conftest.py`. The service layer keeps a single `create_owner_user(db, passphrase) -> User` that raises `OwnerAlreadyExistsError` if a user already exists and `EmptyPassphraseError` for empty input. The previous `ensure_owner_user` (idempotent variant) was deleted — tests use `create_owner_user` after the `db` fixture's truncate, which is always a clean slate.
+
+**Supersedes:** the "Lifespan addition" portion of "Phase 04 auth: passphrase + JWT, no signup, no email" above (the part that described `ensure_owner_user(session, settings.owner_passphrase.get_secret_value())` running inside the lifespan after the DB probe). Also removes the four `tests/api/test_lifespan.py` tests that exercised that seeding behaviour.
+
+**Why:**
+- User's call: "i don't want to put the paraphrase in env." Putting the passphrase in `OWNER_PASSPHRASE` meant it lived in `.env`, in the deploy environment, and in any process inspector that could read env vars — exactly where a long-lived secret shouldn't sit.
+- The CLI accepts the passphrase as a positional arg (convenient for one-shot setup) **or** prompts via `getpass` (no shell history, no echo). The prompt path requires a second confirmation entry to catch typos.
+- Exit codes are meaningful: `0` success, `1` owner already exists, `2` invalid input (empty passphrase or mismatched prompts) — so wrapper scripts and CI can branch on them cleanly.
+- Service layer cleanup: collapsing `ensure_owner_user` + `create_owner_user` into a single strict function removed the "two functions doing almost the same thing" smell. Tests don't need the idempotent variant because the `db` fixture truncates before each test.
+
+**Operational note:** Rotation is not yet a CLI command — for now, drop the user row directly (`TRUNCATE users RESTART IDENTITY`, or `DELETE FROM users WHERE id = ...`) and re-run `create-owner`. A `rotate-passphrase` subcommand can be added when the need is concrete; the cost of building it speculatively isn't justified yet.
+
+**Alternatives considered:**
+- Keep env-driven seeding but only on first boot (rejected — passphrase still has to land in the env at least once, defeating the point).
+- Always-prompt CLI (no positional arg) — rejected, would force a TTY for what may be a non-interactive deploy step (e.g. `fly ssh console -C ...`).
+- Two CLI commands (`create-owner` strict + `rotate-passphrase` for replace) — deferred; one command covers the immediate need.
+
+---
+
+## 2026-05-02 — Test infrastructure: minimal conftest + per-module reset
+**Choice:** `tests/conftest.py` shrinks to env defaults + a `db` fixture (just yields a `SessionLocal()`) + a `client` fixture (TestClient with `get_db` override). It no longer creates `me_test`, no longer applies migrations, no longer truncates between tests. Those concerns split into:
+
+- **Operator-side DB lifecycle** — three new Makefile targets (`test-db-create`, `test-db-migrate`, `test-db-reset`). Operator workflow is `make up && make test-db-migrate && make test`; re-run `test-db-migrate` after any new Alembic revision. The migrate target must pass a dummy `JWT_SECRET` because `migrations/env.py` imports `app.models.user`, which transitively loads `Settings`.
+- **Per-module reset** — `tests/_db.py` exposes `reset_db()` and `seed_owner()`. Each test module that touches the DB declares one autouse module-scoped fixture: `_reset` (truncate only) or `_setup` (truncate + seed). Tests inside a module share state and run in source order.
+- **`_test`-suffix tripwire** — moved out of conftest into `reset_db()` itself. If `DATABASE_URL` points at any DB whose name doesn't end in `_test`, the assertion fails on the first DB-touching test and aborts with a clear error rather than truncating production-adjacent data.
+
+**Test files reorganized along the "starts empty" / "starts seeded" axis:**
+
+| File | Module fixture | Purpose |
+|---|---|---|
+| `tests/api/test_auth_unauthenticated.py` (new) | `_reset` | All auth-surface tests that need an empty `users` table |
+| `tests/api/test_auth_authenticated.py` (new) | `_setup` (seeds owner) | All auth-surface tests that need an existing user |
+| `tests/api/test_auth_no_log_leak.py` | `_setup` (seeds owner + bumps log level to INFO) | Log-redaction tests |
+| `tests/api/test_owner.py` | `_reset` | `create_owner_user` semantics; tests ordered to accumulate state |
+| `tests/api/test_cli.py` | `_reset` | CLI subcommand tests; ordered the same way |
+| `tests/unit/test_cli_prompt.py` (new) | none (pure functions) | Covers `_read_passphrase_interactively` with monkeypatched `getpass` |
+
+Files deleted: `tests/api/test_auth_login.py`, `tests/api/test_auth_me.py`, `tests/api/test_auth_verify.py` (their tests redistribute into the two new state-axis files).
+
+One previously-existing integration test was dropped: `test_create_owner_via_cli_prompts_when_arg_omitted`. With module-scope reset, it would have created a second owner via prompt-mode, which conflicts with the prior `test_inserts_user_via_arg` having already created one. The lost coverage is recovered by the two unit tests in `tests/unit/test_cli_prompt.py`, which exercise the prompt helper directly without DB involvement.
+
+**Supersedes:** the "Test-DB fixture (supersedes phase-02 deferral)" section of the "Phase 04 auth: passphrase + JWT, no signup, no email" entry above (the part that described the autouse session-scoped `_ensure_test_database`, `_apply_migrations`, and per-test TRUNCATE in conftest). The phase-02 deferral entry remains relevant for the historical context, but the implementation it predicted is now superseded by this entry.
+
+**Why:**
+- User's call: "lets not do things in conftest, lets assume app is currently running, ket the conftest just returns the db session for tests or whatever industry standard is" — the per-test TRUNCATE + autouse migrations in conftest were doing too much; the operator-side Makefile + per-module reset is the more standard split (DB lifecycle outside test code, isolation strategy declared by each test module).
+- Module-scoped reset (rather than function-scoped) was the user's specific choice when offered the trade-off. It's faster (one TRUNCATE per module instead of per test) at the cost of requiring tests inside a module to coexist. The reorganization above puts each test in a module whose starting state matches its needs.
+- Test runtime: 1.6s → 1.0s on the local machine (43 tests). Modest absolute saving, will compound as the suite grows.
+
+**Known constraints with module-scope reset:**
+- Tests within a module share state and rely on execution order. pytest runs tests in source order by default; we depend on that. If anyone introduces test-ordering randomization (`pytest-randomly`), the `test_owner.py` and `test_cli.py` modules will fail. Document this if/when CI lands.
+- Adding a new test that needs a different starting state than its module is a signal to either reorder or split the file, not to insert an ad-hoc reset.
+
+**Alternatives considered:**
+- Function-scoped reset implemented via per-module fixtures (each test still gets clean state, fixture just lives next to the tests instead of in conftest) — rejected by user in favour of true per-module sharing.
+- Transaction-rollback-per-test (savepoints + connection-bound session) — rejected, breaks because `/auth/login` and several other paths call `.commit()`; making it work requires a "join the test transaction" hook that's significantly more code than module-scope reset.
+- Keep the autouse DB-lifecycle fixtures but split out the truncate — rejected, conftest still owns the test DB existence and schema, which the user explicitly didn't want.
