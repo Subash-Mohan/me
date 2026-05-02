@@ -103,7 +103,7 @@ These come from the master plan §6. Phase files do not repeat them; they apply 
 4. **Time / TZ.** Store everything in UTC. Mobile sends user TZ on every call. Reminders fire on local wall-clock and survive DST.
 5. **Privacy.** Never log message bodies or image bytes — only IDs, timestamps, error types. Image URLs are short-lived signed URLs. The OpenRouter API key never leaves the backend.
 6. **Rate limiting.** Per-user soft daily LLM budget (default 200 calls/day). Over budget = degrade to a cheaper model, never hard-fail. Extraction is unlimited (cheap, async).
-7. **Failure isolation.** Extraction failures never affect browse or capture. After 5 retries an entry is marked `extraction_failed` and surfaced in a "needs attention" list.
+7. **Failure isolation (runtime, not boot).** Extraction failures never affect browse or capture. After 5 retries an entry is marked `extraction_failed` and surfaced in a "needs attention" list. **Scope:** rules 2 and 7 — "stay up under failure", "outages must never block sending or browsing" — are *runtime* invariants. Process startup is a different regime: the `lifespan` startup body **fail-fasts** on missing hard dependencies (DB unreachable → log + raise → process exits). Misconfiguration should crash at deploy time, not silently serve degraded responses. Retry is the orchestrator's job (Fly.io / k8s restart policy), not the app's.
 8. **No hardcoded secrets.** Everything via env vars: `DATABASE_URL`, `JWT_SECRET`, `OPENROUTER_API_KEY`, `OPENROUTER_DEFAULT_MODEL`, `FCM_SERVER_KEY`, `IMAGE_STORAGE_BACKEND` (`local` | `supabase`), `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`.
 
 ---
