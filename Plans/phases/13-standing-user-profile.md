@@ -7,7 +7,7 @@ Maintain a small (~300–500 token) text profile per user, regenerated weekly, p
 
 ## Functional requirements
 Storage:
-- `profiles` row already exists (phase 03). Stores `text` and `regenerated_at`.
+- `profiles` row should already exist by this phase (added by phase 10's chat-meta-and-profile work). Stores `text` and `regenerated_at`. If phase 10 hasn't shipped the table yet, add it as part of this phase's migration.
 
 Regeneration job:
 - `pg_cron` job (or APScheduler equivalent) runs weekly at a per-user-configurable time (default Sunday 03:00 user-local).

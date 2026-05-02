@@ -20,7 +20,7 @@ Async SQLAlchemy session is available as a FastAPI dependency, the health route 
 - `pgvector` extension is created automatically on first migration (or via an idempotent helper).
 
 ## Out of scope
-- No domain models yet (phase 03).
+- No domain models yet — they're added per-phase from phase 04 onwards. Phase 03 only sets data-layer conventions and wires `env.py`.
 - No auth, no real endpoints.
 
 ## Depends on

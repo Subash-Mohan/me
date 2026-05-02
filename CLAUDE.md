@@ -26,7 +26,7 @@ When the user says "let's start phase NN", read `CLAUDE.md` + `Plans/phases/NN-*
 | 00 | `00-python-env.md` | Python toolchain, project skeleton, lint/format/type-check tooling |
 | 01 | `01-postgres-docker-and-fastapi-init.md` | docker-compose Postgres+pgvector, FastAPI skeleton, Alembic init |
 | 02 | `02-database-fastapi-integration.md` | Async SQLAlchemy session wired into FastAPI, DB-backed health route |
-| 03 | `03-data-models.md` | All SQLAlchemy models + Pydantic schemas + first table-creation migration |
+| 03 | `03-data-models.md` | Data-layer conventions + Alembic `env.py` wiring — no tables yet (added per-phase from 04 onwards) |
 | 04 | `04-auth-endpoints.md` | Custom signup/signin/refresh/me with JWT |
 | 05 | `05-memory-endpoints.md` | Memory list / detail / edit / delete |
 | 06 | `06-chat-capture.md` | Streaming chat endpoint, capture-only agent, `save_memory` tool |
@@ -113,7 +113,7 @@ These come from the master plan §6. Phase files do not repeat them; they apply 
 - **Sync HTTP, async only in workers.** FastAPI routes, route services, and the DB sessions they use are sync (`def`, `psycopg`, sync `Session`). `asyncio` is reserved for `app/workers/` — that's where LLM calls, embeddings, image upload, and reminder dispatch fan out concurrently. Don't introduce `async def` in routes or in the services they call.
 - **Type-hinted.** Public functions are fully typed. CI runs `ty check` on `app/` (replaces mypy — see `DECISIONS.md` 2026-05-02).
 - **Lint/format.** `ruff check` + `ruff format`. Pre-commit enforces both.
-- **Migrations.** Every model change ships with an Alembic migration in the same PR. Never edit a migration that has been applied to a shared environment.
+- **Migrations.** Every model change ships with an Alembic migration in the same PR. Models, Pydantic schemas, and Alembic revisions are added in the phase that first writes to them — phase 03 ships only the conventions doc and `env.py` wiring; phase 04 ships the first table. Never edit a migration that has been applied to a shared environment.
 - **Tests.** pytest. Integration tests use a real Postgres test container (testcontainers-python or compose). No DB mocks. Each endpoint has at least one happy-path integration test.
 - **Logging.** Structured (JSON) at INFO+; never log message content or image bytes.
 - **Errors.** Raise FastAPI `HTTPException` only at the API boundary; services raise typed domain errors.
