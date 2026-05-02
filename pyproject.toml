@@ -4,7 +4,13 @@ version = "0.0.0"
 description = "Single-user chat-first journaling app with a memory layer"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.13",
     "fastapi",
+    "psycopg[binary]>=3.1",
+    "pydantic-settings>=2.0",
+    "sqlalchemy>=2.0",
+    "structlog>=24.0",
+    "uvicorn[standard]>=0.30",
 ]
 
 [dependency-groups]
@@ -13,6 +19,7 @@ dev = [
     "ruff",
     "ty",
     "pre-commit",
+    "httpx>=0.28.1",
 ]
 
 [build-system]

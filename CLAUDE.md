@@ -48,8 +48,8 @@ When the user says "let's start phase NN", read `CLAUDE.md` + `Plans/phases/NN-*
 | Layer | Dev | Prod |
 |---|---|---|
 | Language | Python 3.12+ | same |
-| API | FastAPI (async) | same |
-| ORM / migrations | SQLAlchemy 2.x async + Alembic | same |
+| API | FastAPI (sync handlers) | same |
+| ORM / migrations | SQLAlchemy 2.x (sync in API, async in worker) + Alembic | same |
 | Database | Postgres-in-Docker (with pgvector) | Supabase Postgres (with pgvector) |
 | Auth | Custom JWT (our own endpoints) | same — does **not** use Supabase Auth |
 | Object storage | Local FS under `./var/images/` | Supabase Storage (signed URLs) |
@@ -95,7 +95,7 @@ Don't invent new top-level dirs without recording the choice in `DECISIONS.md`.
 These come from the master plan §6. Phase files do not repeat them; they apply everywhere.
 
 1. **Source of truth = `entries` table.** One row per chat turn. Memories, facts, embeddings, profile, image references are all derived and rebuildable. Build "reprocess all entries" from day one (phase 12).
-2. **Sync vs async boundary.** The chat send must return as soon as the message row is written (< 200ms). Intent classification, fact extraction, embeddings, image upload, profile regeneration, reminder dispatch are async. Memory CRUD never calls an LLM. **LLM outages must never block sending or browsing.**
+2. **Sync API, async worker.** FastAPI handlers are sync — they do the minimum (write the entry row, enqueue follow-up work) and return as soon as the message row is written (< 200ms). Everything that needs concurrency — intent classification, fact extraction, embeddings, image upload, profile regeneration, reminder dispatch — runs inside the background worker (`app/workers/`), which is the only place `asyncio` lives. Memory CRUD never calls an LLM. **LLM outages must never block sending or browsing.**
 3. **Idempotency.**
    - Client supplies a UUID per chat message; backend upserts on it.
    - Image uploads dedupe by content hash.
@@ -110,7 +110,7 @@ These come from the master plan §6. Phase files do not repeat them; they apply 
 
 ## Coding standards
 
-- **Async-first.** Routes, DB calls, HTTP clients are all `async`. No sync DB sessions.
+- **Sync HTTP, async only in workers.** FastAPI routes, route services, and the DB sessions they use are sync (`def`, `psycopg`, sync `Session`). `asyncio` is reserved for `app/workers/` — that's where LLM calls, embeddings, image upload, and reminder dispatch fan out concurrently. Don't introduce `async def` in routes or in the services they call.
 - **Type-hinted.** Public functions are fully typed. CI runs `ty check` on `app/` (replaces mypy — see `DECISIONS.md` 2026-05-02).
 - **Lint/format.** `ruff check` + `ruff format`. Pre-commit enforces both.
 - **Migrations.** Every model change ships with an Alembic migration in the same PR. Never edit a migration that has been applied to a shared environment.
