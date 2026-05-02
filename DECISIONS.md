@@ -40,3 +40,11 @@ Append-only log of implementer judgment calls. Never edit a past entry — super
 **Choice:** Phase 00's `app/main.py` instantiates `FastAPI(title="Byte Journal")` with no routes.
 **Why:** Phase 01 adds the first route on top of this object. Having the instance present from day one means later phases never need to scaffold the app factory — they just register routers.
 **Alternatives considered:** App-factory pattern (`def create_app() -> FastAPI`) — deferred to whenever multi-environment config makes it valuable; not needed for a single-user app yet.
+
+---
+
+## 2026-05-02 — Application name: "Me" (renamed from "Byte Journal")
+**Choice:** Application name is "Me". Package slug `me`, FastAPI title `"Me"`, dev DB user/pass/db `me`, Supabase bucket prefix `me-images-*`.
+**Why:** "Byte Journal" was the working title carried through phase 00 scaffolding and the master plan; the user confirmed the actual product name is "Me". Renaming now (one phase in, no migrations or buckets created yet) is far cheaper than after they exist.
+**Supersedes:** the 2026-05-02 entry above naming the FastAPI instance `title="Byte Journal"` — read it as `title="Me"` going forward.
+**Alternatives considered:** keeping the package slug as `byte-journal` for stability — rejected because nothing depends on it externally yet.

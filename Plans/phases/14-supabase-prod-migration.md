@@ -15,7 +15,7 @@ Storage:
   - `put` uploads blob + returns storage_ref.
   - `get_signed_url(ref, ttl_seconds)` issues a signed URL.
   - `delete` removes the blob.
-- Bucket layout: one bucket per env (`byte-journal-images-staging`, `byte-journal-images-prod`). Private bucket; access only via signed URLs.
+- Bucket layout: one bucket per env (`me-images-staging`, `me-images-prod`). Private bucket; access only via signed URLs.
 - `IMAGE_STORAGE_BACKEND=supabase` selects this implementation.
 - Signed URL TTL configurable: short (e.g., 5 min) for memory-browser thumbnails, longer (e.g., 1h) for detail views — record exact values in `DECISIONS.md`.
 

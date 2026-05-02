@@ -1,4 +1,4 @@
-# Byte Journal — agent context
+# Me — agent context
 
 A single-user, chat-first personal journaling app with a memory layer. Two screens: chat (capture + recall + reminders + image-attach) and memory browser (read/edit). Backend is Python/FastAPI + Postgres + a background worker.
 

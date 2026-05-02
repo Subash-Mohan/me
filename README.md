@@ -1,4 +1,4 @@
-# Byte Journal
+# Me
 
 Single-user, chat-first personal journaling app with a memory layer.
 

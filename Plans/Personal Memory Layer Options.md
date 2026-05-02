@@ -1,4 +1,4 @@
-# Byte Journal — Product & Functional Plan
+# Me — Product & Functional Plan
 
 > **For implementation:** This document describes *what* the system does and *how the user experiences it*. Technical decisions (schema, endpoints, algorithms) are intentionally left to the implementer. The companion document `personal_memory_layer_guide.pdf` describes the memory architecture in technical depth — read it before implementing the memory pipeline.
 
@@ -6,7 +6,7 @@
 
 ## 1. Product summary
 
-Byte Journal is a single-user, chat-first personal journaling app with exactly two screens: a chat surface and a memory browser. The user captures thoughts throughout the day by talking to the chat — typed, voice, or image+text. The same chat is where they ask questions about their past, set reminders, and attach pictures to existing memories. Over time the system builds an active memory of who the user is, what is happening in their life, and how their thoughts evolve.
+Me is a single-user, chat-first personal journaling app with exactly two screens: a chat surface and a memory browser. The user captures thoughts throughout the day by talking to the chat — typed, voice, or image+text. The same chat is where they ask questions about their past, set reminders, and attach pictures to existing memories. Over time the system builds an active memory of who the user is, what is happening in their life, and how their thoughts evolve.
 
 The second screen is a memory browser: a visual feed of every memory the system has stored, with any attached images shown inline. It is read-and-edit, not capture — capture only ever happens through chat.
 
