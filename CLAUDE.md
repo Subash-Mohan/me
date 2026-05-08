@@ -1,8 +1,8 @@
 # Me — agent context
 
-A single-user, chat-first personal journaling app with a memory layer. Two screens: chat (capture + recall + reminders + image-attach) and memory browser (read/edit). Backend is Python/FastAPI + Postgres + a background worker.
+A single-user, chat-first personal journaling app with a memory layer. Two screens: chat (capture + recall + reminders + image-attach) and memory browser (read/edit). Backend is Python/FastAPI + Postgres. Memory is stored and retrieved via the **Supermemory API** — no homegrown extraction/embedding pipeline.
 
-This file is your one-stop briefing. **Do not open the master plan unless a phase file explicitly points you to a section.**
+This file is your one-stop briefing.
 
 ---
 
@@ -10,57 +10,44 @@ This file is your one-stop briefing. **Do not open the master plan unless a phas
 
 | Path | When to read |
 |---|---|
-| `Plans/phases/NN-*.md` | Always — open the one phase you're implementing. |
-| `Plans/Personal Memory Layer Options.md` | Only if a phase file references a specific `§X.Y`. |
-| `personal_memory_layer_guide.pdf` | Only before phases 11–13 (memory pipeline). |
+| `Plans/phases/NN-*.md` | Always — open the one phase you're implementing. The directory is currently empty; phases are authored as work begins. |
 | `DECISIONS.md` | Always — append every implementer judgment call here. Never overwrite. |
 
 When the user says "let's start phase NN", read `CLAUDE.md` + `Plans/phases/NN-*.md` + `DECISIONS.md`. That's it.
 
 ---
 
-## Phase index
+## Status — what's shipped
 
-| # | File | What ships |
-|---|---|---|
-| 00 | `00-python-env.md` | Python toolchain, project skeleton, lint/format/type-check tooling |
-| 01 | `01-postgres-docker-and-fastapi-init.md` | docker-compose Postgres+pgvector, FastAPI skeleton, Alembic init |
-| 02 | `02-database-fastapi-integration.md` | Async SQLAlchemy session wired into FastAPI, DB-backed health route |
-| 03 | `03-data-models.md` | Data-layer conventions + Alembic `env.py` wiring — no tables yet (added per-phase from 04 onwards) |
-| 04 | `04-auth-endpoints.md` | Custom signup/signin/refresh/me with JWT |
-| 05 | `05-memory-endpoints.md` | Memory list / detail / edit / delete |
-| 06 | `06-chat-capture.md` | Streaming chat endpoint, capture-only agent, `save_memory` tool |
-| 07 | `07-chat-recall.md` | Recall intent + search tools (tsvector first, vector after phase 11) |
-| 08 | `08-chat-reminder.md` | Reminder intent + scheduling job + FCM dispatch (stub) |
-| 09 | `09-chat-image-attach.md` | Image upload + image-attach intent + image-bearing capture |
-| 10 | `10-chat-meta-and-profile.md` | Meta intent, profile + settings + export + delete-account endpoints |
-| 11 | `11-memory-pipeline-extraction.md` | Background worker, embeddings, fact extraction |
-| 12 | `12-memory-pipeline-consolidation.md` | Bi-temporal facts, ADD/UPDATE/DELETE/NOOP, reprocess-all |
-| 13 | `13-standing-user-profile.md` | Weekly profile regeneration job |
-| 14 | `14-supabase-prod-migration.md` | Switch to Supabase Postgres + Storage in prod |
-| 15 | `15-deployment-fly-io.md` | Dockerfile, fly.toml, CI/CD, real FCM |
-| 16 | `16-mobile-stub.md` | Placeholder for React Native plans (deferred) |
+Phases 00–04 shipped before the Supermemory pivot (2026-05-08). Their plan files were deleted in the cleanup; the behaviour lives in code + git history:
+
+| # | What shipped |
+|---|---|
+| 00 | Python toolchain (`uv` / `ruff` / `ty`), project skeleton, lint/format/type-check, pre-commit |
+| 01 | docker-compose Postgres, FastAPI skeleton, Alembic init |
+| 02 | Sync SQLAlchemy session, fail-fast lifespan DB probe, `/healthz` round-trip |
+| 03 | Data-layer conventions, Alembic `env.py` wiring (no tables yet) |
+| 04 | Custom passphrase auth (single-user JWT, step-up via `X-Confirm-Passphrase`, owner created via CLI) |
+
+Everything else (memory storage/retrieval, chat capture/recall, reminders, images, profile, deploy) is to be re-planned phase-by-phase against the Supermemory-backed approach.
 
 ---
 
-## Tech stack — dev vs prod
+## Tech stack
 
 | Layer | Dev | Prod |
 |---|---|---|
 | Language | Python 3.12+ | same |
 | API | FastAPI (sync handlers) | same |
-| ORM / migrations | SQLAlchemy 2.x (sync in API, async in worker) + Alembic | same |
-| Database | Postgres-in-Docker (with pgvector) | Supabase Postgres (with pgvector) |
-| Auth | Custom JWT (our own endpoints) | same — does **not** use Supabase Auth |
-| Object storage | Local FS under `./var/images/` | Supabase Storage (signed URLs) |
+| ORM / migrations | SQLAlchemy 2.x (sync) + Alembic | same |
+| Database | Postgres in Docker | TBD |
+| Auth | Custom passphrase + JWT (our own endpoints) | same |
+| Memory | Supermemory API | same |
+| Object storage | Local FS under `./var/images/` | TBD |
 | LLM | OpenRouter (OpenAI SDK pointed at it) | same |
-| Push | FCM stubbed (logs only) | FCM real credentials |
-| Hosting | local | Fly.io |
-| Scheduler | `pg_cron` if available, else APScheduler | `pg_cron` |
+| Hosting | local | TBD |
 
-Single Docker image, two entrypoints: `api` (FastAPI/uvicorn) and `worker` (background worker).
-
-The same SQLAlchemy code runs against both local Postgres and Supabase Postgres — Supabase is just managed Postgres underneath. Only config and the storage adapter change between environments.
+Single-user app. Prod choices (DB host, storage, hosting, push) get resolved in their own phases.
 
 ---
 
@@ -69,19 +56,20 @@ The same SQLAlchemy code runs against both local Postgres and Supabase Postgres 
 ```
 .
 ├── app/
-│   ├── api/            # FastAPI routers (auth, memories, chat, profile, ...)
-│   ├── agents/         # chat agent + tools (save_memory, search_facts, ...)
-│   ├── workers/        # background worker entrypoints + jobs
+│   ├── api/            # FastAPI routers
+│   ├── agents/         # chat agent + tools (empty scaffold)
+│   ├── workers/        # background worker entrypoints (empty scaffold)
 │   ├── services/       # cross-cutting business logic
 │   ├── models/         # SQLAlchemy models
 │   ├── schemas/        # Pydantic request/response schemas
 │   ├── db/             # session, engine, base
 │   ├── core/           # config, security, logging, deps
-│   └── main.py         # FastAPI app factory
+│   ├── cli.py          # admin CLI (e.g. create-owner)
+│   └── main.py         # FastAPI app + lifespan
 ├── migrations/         # Alembic
 ├── tests/              # pytest (real Postgres, no DB mocks)
 ├── docker/             # Dockerfile, docker-compose.yml
-├── Plans/              # master plan + phases/
+├── Plans/phases/       # per-phase plans (currently empty)
 ├── DECISIONS.md
 └── pyproject.toml
 ```
@@ -92,30 +80,27 @@ Don't invent new top-level dirs without recording the choice in `DECISIONS.md`.
 
 ## Cross-cutting rules — non-negotiable
 
-These come from the master plan §6. Phase files do not repeat them; they apply everywhere.
+These apply everywhere unless a phase file explicitly overrides them.
 
-1. **Source of truth = `entries` table.** One row per chat turn. Memories, facts, embeddings, profile, image references are all derived and rebuildable. Build "reprocess all entries" from day one (phase 12).
-2. **Sync API, async worker.** FastAPI handlers are sync — they do the minimum (write the entry row, enqueue follow-up work) and return as soon as the message row is written (< 200ms). Everything that needs concurrency — intent classification, fact extraction, embeddings, image upload, profile regeneration, reminder dispatch — runs inside the background worker (`app/workers/`), which is the only place `asyncio` lives. Memory CRUD never calls an LLM. **LLM outages must never block sending or browsing.**
-3. **Idempotency.**
+1. **Sync API.** FastAPI routes and the services they call are sync (`def`, `psycopg`, sync `Session`). Don't introduce `async def` in routes. If a worker is reintroduced, that's the only place `asyncio` lives.
+2. **Idempotency.**
    - Client supplies a UUID per chat message; backend upserts on it.
    - Image uploads dedupe by content hash.
-   - Re-running extraction on an entry must not duplicate facts.
-4. **Time / TZ.** Store everything in UTC. Mobile sends user TZ on every call. Reminders fire on local wall-clock and survive DST.
-5. **Privacy.** Never log message bodies or image bytes — only IDs, timestamps, error types. Image URLs are short-lived signed URLs. The OpenRouter API key never leaves the backend.
-6. **Rate limiting.** Per-user soft daily LLM budget (default 200 calls/day). Over budget = degrade to a cheaper model, never hard-fail. Extraction is unlimited (cheap, async).
-7. **Failure isolation (runtime, not boot).** Extraction failures never affect browse or capture. After 5 retries an entry is marked `extraction_failed` and surfaced in a "needs attention" list. **Scope:** rules 2 and 7 — "stay up under failure", "outages must never block sending or browsing" — are *runtime* invariants. Process startup is a different regime: the `lifespan` startup body **fail-fasts** on missing hard dependencies (DB unreachable → log + raise → process exits). Misconfiguration should crash at deploy time, not silently serve degraded responses. Retry is the orchestrator's job (Fly.io / k8s restart policy), not the app's.
-8. **No hardcoded secrets.** Everything via env vars: `DATABASE_URL`, `JWT_SECRET`, `OPENROUTER_API_KEY`, `OPENROUTER_DEFAULT_MODEL`, `FCM_SERVER_KEY`, `IMAGE_STORAGE_BACKEND` (`local` | `supabase`), `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`.
+3. **Time / TZ.** Store everything in UTC. Mobile sends user TZ on every call. Reminders fire on local wall-clock and survive DST.
+4. **Privacy.** Never log message bodies, image bytes, or passphrases — only IDs, timestamps, error types. API keys (Supermemory, OpenRouter) never leave the backend.
+5. **Failure isolation (runtime).** External-API failures (Supermemory, OpenRouter) must never block sending or browsing of locally-persisted data. **Boot is a different regime:** the `lifespan` startup body fail-fasts on missing hard dependencies (DB unreachable → log + raise → process exits). Misconfiguration should crash at deploy time, not silently serve degraded responses. Retry is the orchestrator's job, not the app's.
+6. **No hardcoded secrets.** Everything via env vars: `DATABASE_URL`, `JWT_SECRET`, `OPENROUTER_API_KEY`, `OPENROUTER_DEFAULT_MODEL`, `SUPERMEMORY_API_KEY`. Storage and push config get their own env vars when those phases land.
 
 ---
 
 ## Coding standards
 
-- **Sync HTTP, async only in workers.** FastAPI routes, route services, and the DB sessions they use are sync (`def`, `psycopg`, sync `Session`). `asyncio` is reserved for `app/workers/` — that's where LLM calls, embeddings, image upload, and reminder dispatch fan out concurrently. Don't introduce `async def` in routes or in the services they call.
-- **Type-hinted.** Public functions are fully typed. CI runs `ty check` on `app/` (replaces mypy — see `DECISIONS.md` 2026-05-02).
+- **Sync HTTP.** Routes, services, and DB sessions are sync. See cross-cutting rule 1.
+- **Type-hinted.** Public functions are fully typed. CI runs `ty check` on `app/`.
 - **Lint/format.** `ruff check` + `ruff format`. Pre-commit enforces both.
-- **Migrations.** Every model change ships with an Alembic migration in the same PR. Models, Pydantic schemas, and Alembic revisions are added in the phase that first writes to them — phase 03 ships only the conventions doc and `env.py` wiring; phase 04 ships the first table. Never edit a migration that has been applied to a shared environment.
-- **Tests.** pytest. Integration tests use a real Postgres test container (testcontainers-python or compose). No DB mocks. Each endpoint has at least one happy-path integration test.
-- **Logging.** Structured (JSON) at INFO+; never log message content or image bytes.
+- **Migrations.** Every model change ships with an Alembic migration in the same PR. Never edit a migration that has been applied to a shared environment.
+- **Tests.** pytest. Integration tests use real Postgres (operator-side `make test-db-migrate`). No DB mocks. Each endpoint has at least one happy-path integration test.
+- **Logging.** Structured (`structlog`) at INFO+; never log message content, image bytes, or passphrases.
 - **Errors.** Raise FastAPI `HTTPException` only at the API boundary; services raise typed domain errors.
 - **Comments.** Default to none. Add only where the *why* is non-obvious.
 
@@ -123,7 +108,7 @@ These come from the master plan §6. Phase files do not repeat them; they apply 
 
 ## Decisions log
 
-`DECISIONS.md` records every implementer judgment call (lib version, retry params, embedding model id, schema trade-off). Format:
+`DECISIONS.md` records every implementer judgment call (lib version, retry params, schema trade-off). Format:
 
 ```
 ## YYYY-MM-DD — <topic>
@@ -132,14 +117,14 @@ These come from the master plan §6. Phase files do not repeat them; they apply 
 **Alternatives considered:** ...
 ```
 
-Append-only. Never edit a past entry — supersede it with a new one referencing the old.
+Append-only. Never edit a past entry — supersede it with a new one referencing the old. The previous `DECISIONS.md` was wiped on 2026-05-08 as part of the Supermemory pivot; rebuild it from the next decision onward.
 
 ---
 
 ## Plan workflow per chunk
 
 1. Read this file (already loaded) + the phase file + `DECISIONS.md`.
-2. If the phase file is still high-level, refine it with the user (concrete schema, exact endpoint shapes, lib choices) before coding.
+2. If a phase file doesn't exist yet, refine the user's intent into one before coding (concrete schema, exact endpoint shapes, lib choices).
 3. Implement against the phase's verification list.
 4. Land migrations + tests in the same change set.
 5. Append any judgment call to `DECISIONS.md`.
