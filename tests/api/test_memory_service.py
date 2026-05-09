@@ -1,7 +1,8 @@
 """Integration tests for the memory service layer.
 
-Real Postgres + `FakeMemoryClient`. Each test class resets the DB once and
-seeds an owner; tests within a class accumulate memory rows.
+Real Postgres + `FakeMemoryClient`. The `owner_id` fixture is function-scoped
+and calls `reset_db()`, so every test starts from a clean DB with a freshly
+seeded owner — tests do not share state.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.models.memory import Memory
 from app.services import memory as memory_service
 from app.services.memory import (
+    MemoryIdempotencyReused,
     MemoryNotFound,
     MemoryValidationError,
 )
@@ -354,6 +356,33 @@ class TestCreateMemory:
         assert row.deleted_at is None
         assert row.text == "phoenix"
 
+    def test_reusing_idempotency_id_of_soft_deleted_raises(
+        self, db: Session, owner_id: UUID, memory_client: FakeMemoryClient
+    ) -> None:
+        # Seed a soft-deleted row, then retry create_memory with the same
+        # idempotency_id (= primary key). Layer-1 lookup must see the tombstone
+        # and raise rather than letting the INSERT crash on the unconditional
+        # PK constraint.
+        idem = uuid4()
+        seed_memory(
+            user_id=owner_id,
+            text_body="ghost",
+            deleted_at=datetime(2026, 5, 8, tzinfo=UTC),
+            id=idem,
+        )
+        with pytest.raises(MemoryIdempotencyReused):
+            memory_service.create_memory(
+                db,
+                memory_client,
+                user_id=owner_id,
+                text="reborn body",
+                event_date=date(2026, 5, 9),
+                event_tz="UTC",
+                idempotency_id=idem,
+            )
+        # No client call — the failure happens before the SDK is touched.
+        assert memory_client.calls == []
+
 
 # ─── update_memory ─────────────────────────────────────────────────────────
 
@@ -586,6 +615,32 @@ class TestUpdateMemory:
         ops = [op for op, _ in memory_client.calls]
         assert ops == ["add"]
 
+    def test_update_advances_external_synced_at_on_patch(
+        self, db: Session, owner_id: UUID, memory_client: FakeMemoryClient
+    ) -> None:
+        # The patch success path must refresh `external_synced_at`.
+        row = memory_service.create_memory(
+            db,
+            memory_client,
+            user_id=owner_id,
+            text="initial",
+            event_date=date(2026, 5, 8),
+            event_tz="UTC",
+        )
+        first_sync = row.external_synced_at
+        assert first_sync is not None
+
+        updated = memory_service.update_memory(
+            db,
+            memory_client,
+            user_id=owner_id,
+            memory_id=row.id,
+            text="revised",
+        )
+        assert updated.external_status == "synced"
+        assert updated.external_synced_at is not None
+        assert updated.external_synced_at >= first_sync
+
 
 # ─── delete_memory ─────────────────────────────────────────────────────────
 
@@ -712,6 +767,58 @@ class TestDeleteMemory:
             user_id=owner_id,
             memory_id=mid,
         )
+        assert memory_client.calls == []
+
+    def test_happy_path_resets_external_status_to_synced(
+        self, db: Session, owner_id: UUID, memory_client: FakeMemoryClient
+    ) -> None:
+        # After successful delete, status must read 'synced' so a later
+        # sync_memory cannot route through the patch branch.
+        row = memory_service.create_memory(
+            db,
+            memory_client,
+            user_id=owner_id,
+            text="will be deleted",
+            event_date=date(2026, 5, 8),
+            event_tz="UTC",
+        )
+        memory_service.delete_memory(db, memory_client, user_id=owner_id, memory_id=row.id)
+
+        from sqlalchemy import select as _select
+
+        from app.models.memory import Memory as _Memory
+
+        refreshed = db.execute(_select(_Memory).where(_Memory.id == row.id)).scalar_one()
+        assert refreshed.deleted_at is not None
+        assert refreshed.external_status == "synced"
+        assert refreshed.external_error is None
+
+    def test_unsynced_with_external_id_delete_clears_status(
+        self, db: Session, owner_id: UUID, memory_client: FakeMemoryClient
+    ) -> None:
+        # Reproduces the regression the status reset guards against:
+        # row was already in 'unsynced' with an external_id; a successful
+        # delete must clear the unsynced flag, not leave it pointing at a
+        # now-deleted Supermemory document.
+        mid = seed_memory(
+            user_id=owner_id,
+            text_body="orphan-with-doc",
+            external_status="unsynced",
+            external_id="doc_orphan",
+            external_error="MemoryClientTransientError",
+        )
+        memory_service.delete_memory(db, memory_client, user_id=owner_id, memory_id=mid)
+
+        from sqlalchemy import select as _select
+
+        from app.models.memory import Memory as _Memory
+
+        refreshed = db.execute(_select(_Memory).where(_Memory.id == mid)).scalar_one()
+        assert refreshed.external_status == "synced"
+        assert refreshed.external_error is None
+        # And a follow-up sync_memory must short-circuit (no client call).
+        memory_client.calls.clear()
+        memory_service.sync_memory(db, memory_client, user_id=owner_id, memory_id=mid)
         assert memory_client.calls == []
 
 

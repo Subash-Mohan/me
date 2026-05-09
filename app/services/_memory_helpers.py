@@ -14,7 +14,7 @@ from datetime import date
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from app.services.memory import MemoryValidationError
+from app.services._memory_errors import MemoryValidationError
 
 _CURSOR_VERSION = 1
 
@@ -41,6 +41,18 @@ def validate_tz(name: str) -> str:
     except (ZoneInfoNotFoundError, ValueError) as exc:
         raise MemoryValidationError(f"unknown timezone: {name!r}") from exc
     return name
+
+
+def validate_location_pair(lat: float | None, lng: float | None) -> None:
+    """Raise `MemoryValidationError` unless lat/lng are both NULL or both
+    in-range. `(lat=NULL, lng=37)` is rejected — coordinates are paired or
+    absent."""
+    if (lat is None) != (lng is None):
+        raise MemoryValidationError("location_lat and location_lng must be set together")
+    if lat is not None and not -90 <= lat <= 90:
+        raise MemoryValidationError("location_lat out of range")
+    if lng is not None and not -180 <= lng <= 180:
+        raise MemoryValidationError("location_lng out of range")
 
 
 def encode_cursor(event_date: date, memory_id: UUID) -> str:
