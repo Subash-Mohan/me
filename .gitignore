@@ -6,6 +6,9 @@
 # Local app data
 var/
 
+# Per-phase implementation plans (working notes, not source)
+Plans/
+
 # Python
 __pycache__/
 *.pyc

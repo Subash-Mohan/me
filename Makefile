@@ -4,7 +4,7 @@ COMPOSE := docker compose -f docker/docker-compose.yml
 
 up:
 	$(COMPOSE) up -d
-	@echo "Postgres is up on $${DATABASE_URL:-postgresql+psycopg://me:me@localhost:5434/me}"
+	@echo "Postgres is up on $${DATABASE_URL:-postgresql+psycopg://me:me@localhost:5435/me}"
 
 down:
 	$(COMPOSE) down
@@ -37,7 +37,7 @@ test-db-create:
 	$(COMPOSE) exec -T db createdb -U me me_test 2>/dev/null || true
 
 test-db-migrate: test-db-create
-	DATABASE_URL=postgresql+psycopg://me:me@localhost:5434/me_test \
+	DATABASE_URL=postgresql+psycopg://me:me@localhost:5435/me_test \
 	JWT_SECRET=dummy-not-used-by-alembic-but-required-by-settings \
 	uv run alembic upgrade head
 

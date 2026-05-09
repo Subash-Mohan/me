@@ -1,7 +1,7 @@
 import os
 from collections.abc import Iterator
 
-os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://me:me@localhost:5434/me_test")
+os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://me:me@localhost:5435/me_test")
 os.environ.setdefault("ENV", "test")
 os.environ.setdefault("LOG_LEVEL", "WARNING")
 os.environ.setdefault("JWT_SECRET", "x" * 32)
