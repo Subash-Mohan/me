@@ -108,3 +108,28 @@ With caching on, a logger created at module import (when conftest sets `LOG_LEVE
 **Choice:** `openai-agents>=0.17` (resolves to 0.17.0).
 **Why:** Matches established pin style (`supermemory>=3.39.0`, `pytest-httpx>=0.36.2`). The originally-drafted floor of `>=0.0.1` was effectively unpinned and would drift silently on future `uv lock --upgrade`.
 **Alternatives considered:** `>=0.0.1` (too loose); `==0.17.0` (stricter than the rest of the file, no project-wide reason to enforce here).
+
+## 2026-05-09 — chat agent runtime async carve-out
+**Choice:** The future `/chat` streaming route — and only that route — is `async def`. Everything else (handlers, services) stays sync per CLAUDE.md rule 1.
+**Why:** OpenAI Agents SDK only streams from an async iterator (`Runner.run_streamed`). Bridging via threads + queues was considered and rejected as more code for no benefit.
+**Alternatives considered:** Hand-rolled OpenAI Chat Completions streaming loop (lose SDK tool loop, future hosted tools); thread-bridge sync handler.
+
+## 2026-05-09 — class-based Tool ABC over `@function_tool`
+**Choice:** Tools subclass `Tool[TArgs, TResult]` and own their packet types + emit lifecycle. SDK integration via `FunctionTool(...)` adapter at `app/agents/runtime.py:_adapt`.
+**Why:** Each tool needs to emit per-tool typed packets (`<tool>_start/_call/_end`). The decorator form makes packet ownership awkward and forces all tool result types through `dict`.
+**Alternatives considered:** `@function_tool` with a side-channel registry of packet types; ToolSpec dataclass + decorator hybrid.
+
+## 2026-05-09 — OpenRouter via Chat Completions, not Responses
+**Choice:** `OpenAIChatCompletionsModel` against OpenRouter base URL.
+**Why:** OpenRouter implements Chat Completions only; Responses API is OpenAI-direct.
+**Alternatives considered:** Wait for OpenRouter Responses support — not viable on this timeline.
+
+## 2026-05-09 — `manage_memory` action discriminator with model_validator
+**Choice:** Single tool with `action: create|update|delete` and `model_validator(mode="after")` enforcing per-action required fields, rather than a Pydantic discriminated union.
+**Why:** LLMs occasionally drop the discriminator key; flat schema with explicit validation is more forgiving.
+**Alternatives considered:** Three separate tools; discriminated union per action.
+
+## 2026-05-09 — manage_memory update cannot clear fields to NULL
+**Choice:** None-from-LLM on `update` is treated as "omitted" (mapped to `_UNSET`), not "set to NULL". Implemented in `_unset_unprovided` at `app/agents/tools/memory.py`.
+**Why:** The LLM cannot natively express the difference between "I'm not setting this" and "I'm clearing this". Clearing is rare in this app.
+**Alternatives considered:** Add a `clear_fields: list[str]` arg — defer until a real need shows up.
