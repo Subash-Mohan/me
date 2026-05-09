@@ -24,6 +24,7 @@ dev = [
     "ty",
     "pre-commit",
     "httpx>=0.28.1",
+    "pytest-asyncio>=1.1",
     "pytest-httpx>=0.36.2",
 ]
 
