@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.auth import router as auth_router
 from app.core.config import get_settings
+from app.core.deps import shutdown_memory_client
 from app.core.logging import configure_logging
 from app.db.session import engine, get_db
 
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         raise RuntimeError("Database unreachable on startup; aborting") from exc
     log.info("startup.db_ok")
     yield
+    shutdown_memory_client()
     engine.dispose()
 
 

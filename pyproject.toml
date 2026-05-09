@@ -12,6 +12,7 @@ dependencies = [
     "pyjwt>=2.8",
     "sqlalchemy>=2.0",
     "structlog>=24.0",
+    "supermemory>=3.39.0",
     "uvicorn[standard]>=0.30",
 ]
 
@@ -22,6 +23,7 @@ dev = [
     "ty",
     "pre-commit",
     "httpx>=0.28.1",
+    "pytest-httpx>=0.36.2",
 ]
 
 [build-system]
