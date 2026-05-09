@@ -30,6 +30,23 @@ def seed_owner(passphrase: str = "test passphrase do not use") -> UUID:
         return user.id
 
 
+def seed_extra_user(passphrase: str = "extra-user-passphrase") -> UUID:
+    """Insert an additional `User` row directly, bypassing the single-owner guard.
+
+    `create_owner_user` refuses to seed a second owner; cross-user isolation
+    tests need a second `user_id` with a satisfied FK so memory rows for that
+    user can be inserted via `seed_memory`.
+    """
+    from app.core.security import hash_passphrase
+    from app.models.user import User
+
+    with SessionLocal() as session:
+        user = User(passphrase_hash=hash_passphrase(passphrase))
+        session.add(user)
+        session.commit()
+        return user.id
+
+
 def seed_memory(
     *,
     user_id: UUID,

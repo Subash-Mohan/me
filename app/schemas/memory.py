@@ -10,7 +10,7 @@ from datetime import date, datetime, time
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 ExternalStatus = Literal["synced", "unsynced", "pending_delete"]
 
@@ -48,6 +48,15 @@ class MemoryPatch(BaseModel):
     location_lat: Annotated[float, Field(ge=-90, le=90)] | None = None
     location_lng: Annotated[float, Field(ge=-180, le=180)] | None = None
     location_label: str | None = None
+
+    @model_validator(mode="after")
+    def _reject_null_for_non_nullable(self) -> MemoryPatch:
+        # `text`, `event_date`, `event_tz` are NOT NULL in the DB and have no
+        # "clear" semantics. `None` is only meaningful as the omission default.
+        for field in ("text", "event_date", "event_tz"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        return self
 
 
 class MemoryDetail(BaseModel):

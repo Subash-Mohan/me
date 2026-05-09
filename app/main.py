@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.auth import router as auth_router
+from app.api.memories import router as memories_router
 from app.core.config import get_settings
 from app.core.deps import shutdown_memory_client
 from app.core.logging import configure_logging
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Me", lifespan=lifespan)
 app.include_router(auth_router)
+app.include_router(memories_router)
 
 
 @app.get("/healthz")

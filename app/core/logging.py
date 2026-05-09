@@ -28,7 +28,8 @@ def configure_logging(settings: Settings) -> None:
         processors=[*shared_processors, renderer],
         wrapper_class=structlog.make_filtering_bound_logger(level),
         logger_factory=structlog.PrintLoggerFactory(),
-        cache_logger_on_first_use=True,
+        # Off so runtime configure_logging() reconfigures take effect on existing loggers.
+        cache_logger_on_first_use=False,
     )
 
     formatter = structlog.stdlib.ProcessorFormatter(
