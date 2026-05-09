@@ -97,16 +97,51 @@ class SearchMemoriesTool(Tool[SearchMemoriesArgs, SearchMemoriesResult]):
 
 
 class ManageMemoryArgs(BaseModel):
-    action: Literal["create", "update", "delete"]
-    memory_id: UUID | None = Field(None, description="Required for update/delete.")
-    text: str | None = Field(None, description="Required for create; optional for update.")
-    event_date: date | None = None
-    event_time: time | None = None
-    event_tz: str | None = None
-    location_lat: float | None = None
-    location_lng: float | None = None
-    location_label: str | None = None
-    idempotency_id: UUID | None = None  # create only
+    action: Literal["create", "update", "delete"] = Field(
+        description=(
+            "create: record a new memory. update/delete: modify or remove an "
+            "existing one — call search_memories first to find the memory_id."
+        )
+    )
+    memory_id: UUID | None = Field(None, description="Required for update and delete.")
+    text: str | None = Field(
+        None,
+        description=(
+            "Memory body. Required for create; optional for update (omit to leave unchanged)."
+        ),
+    )
+    event_date: date | None = Field(
+        None, description="ISO date (YYYY-MM-DD). When the event occurred in event_tz."
+    )
+    event_time: time | None = Field(
+        None,
+        description=(
+            "ISO time (HH:MM or HH:MM:SS, 24-hour) in event_tz local time. "
+            "Omit if the user gave only a date."
+        ),
+    )
+    event_tz: str | None = Field(
+        None,
+        description=(
+            "IANA timezone string, e.g. 'America/New_York'. Never an abbreviation like 'EST'."
+        ),
+    )
+    location_lat: float | None = Field(
+        None, description="Latitude in decimal degrees (WGS84), -90 to 90."
+    )
+    location_lng: float | None = Field(
+        None, description="Longitude in decimal degrees (WGS84), -180 to 180."
+    )
+    location_label: str | None = Field(
+        None, description="Human-readable place name, e.g. 'Joe's Pizza, Brooklyn'."
+    )
+    idempotency_id: UUID | None = Field(
+        None,
+        description=(
+            "create only. Pass the same UUID on retries to dedupe a single "
+            "logical create. Omit for a fresh create."
+        ),
+    )
 
     @model_validator(mode="after")
     def _per_action_required(self) -> "ManageMemoryArgs":
