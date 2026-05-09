@@ -103,3 +103,8 @@ The user IS authenticated (JWT valid); they failed elevation. 401 keeps every "c
 
 ### `structlog` `cache_logger_on_first_use=False`
 With caching on, a logger created at module import (when conftest sets `LOG_LEVEL=WARNING`) keeps its WARNING filter forever — a runtime `LOG_LEVEL` flip has no effect on existing loggers, and the privacy-guard test would pass vacuously. Disabling the cache makes `configure_logging` actually reconfigure live loggers. Per-call overhead is unmeasurable at this scale.
+
+## 2026-05-09 — `openai-agents` floor pin
+**Choice:** `openai-agents>=0.17` (resolves to 0.17.0).
+**Why:** Matches established pin style (`supermemory>=3.39.0`, `pytest-httpx>=0.36.2`). The originally-drafted floor of `>=0.0.1` was effectively unpinned and would drift silently on future `uv lock --upgrade`.
+**Alternatives considered:** `>=0.0.1` (too loose); `==0.17.0` (stricter than the rest of the file, no project-wide reason to enforce here).

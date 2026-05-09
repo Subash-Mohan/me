@@ -8,6 +8,8 @@ os.environ.setdefault("JWT_SECRET", "x" * 32)
 os.environ.setdefault("SUPERMEMORY_API_KEY", "test-key-not-real")
 os.environ.setdefault("SUPERMEMORY_BASE_URL", "http://supermemory.test")
 os.environ.setdefault("SUPERMEMORY_TIMEOUT_MS", "50")
+os.environ.setdefault("OPENROUTER_API_KEY", "test-openrouter-key")
+os.environ.setdefault("OPENROUTER_DEFAULT_MODEL", "openai/gpt-5.4-mini")
 
 import pytest
 from fastapi.testclient import TestClient

@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     supermemory_base_url: str = "https://api.supermemory.ai"
     supermemory_timeout_ms: int = 2000
 
+    openrouter_api_key: SecretStr
+    openrouter_default_model: str
+
     @field_validator("supermemory_base_url")
     @classmethod
     def _strip_trailing_slash(cls, v: str) -> str:
