@@ -8,6 +8,7 @@ row is persisted with `external_status='unsynced'` and surfaced for retry.
 
 from __future__ import annotations
 
+from contextlib import suppress
 from datetime import UTC, date, datetime, time
 from typing import Any, Final, Literal, NamedTuple
 from uuid import UUID
@@ -496,10 +497,18 @@ def search_memories(
         return SearchResult(hits=[], source="supermemory")
 
     doc_ids = [h.doc_id for h in sm_hits]
+    # Supermemory's search response returns `document_id` = customId (= our
+    # Memory.id), while documents.add returns the internal id (stored as
+    # external_id). Hydrate by either: real-API hits match on id, fake-client
+    # tests still match on external_id.
+    uuid_doc_ids: list[UUID] = []
+    for d in doc_ids:
+        with suppress(ValueError):
+            uuid_doc_ids.append(UUID(d))
     rows = (
         db.execute(
             select(Memory).where(
-                Memory.external_id.in_(doc_ids),
+                or_(Memory.id.in_(uuid_doc_ids), Memory.external_id.in_(doc_ids)),
                 Memory.user_id == user_id,
                 Memory.deleted_at.is_(None),
             )
@@ -507,7 +516,11 @@ def search_memories(
         .scalars()
         .all()
     )
-    by_doc_id = {r.external_id: r for r in rows}
+    by_doc_id: dict[str, Memory] = {}
+    for r in rows:
+        by_doc_id[str(r.id)] = r
+        if r.external_id:
+            by_doc_id[r.external_id] = r
 
     hits: list[tuple[Memory, float | None]] = []
     for h in sm_hits:

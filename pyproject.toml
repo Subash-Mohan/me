@@ -47,3 +47,7 @@ include = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = ["-m", "not eval"]
+markers = [
+    "eval: runs the agent end-to-end against real OpenRouter; opt-in via `-m eval`",
+]

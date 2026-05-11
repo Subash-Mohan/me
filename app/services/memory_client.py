@@ -301,7 +301,7 @@ class SupermemoryClient:
         try:
             resp = self._sdk.search.documents(
                 q=q,
-                container_tag=container_tag,
+                container_tags=[container_tag],
                 limit=limit,
             )
         except Exception as exc:

@@ -1,9 +1,10 @@
 import asyncio
+import re
 from datetime import date, time
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.agents.context import AgentContext
 from app.agents.tools._base import Tool
@@ -127,13 +128,27 @@ class ManageMemoryArgs(BaseModel):
         ),
     )
     location_lat: float | None = Field(
-        None, description="Latitude in decimal degrees (WGS84), -90 to 90."
+        None,
+        description=(
+            "Latitude in decimal degrees (WGS84), -90 to 90. ONLY set this if "
+            "the user explicitly provided numeric coordinates. Never infer "
+            "from a place name."
+        ),
     )
     location_lng: float | None = Field(
-        None, description="Longitude in decimal degrees (WGS84), -180 to 180."
+        None,
+        description=(
+            "Longitude in decimal degrees (WGS84), -180 to 180. ONLY set this "
+            "if the user explicitly provided numeric coordinates. Never infer "
+            "from a place name."
+        ),
     )
     location_label: str | None = Field(
-        None, description="Human-readable place name, e.g. 'Joe's Pizza, Brooklyn'."
+        None,
+        description=(
+            "Human-readable place name from what the user said, e.g. "
+            "'Joe's Pizza, Brooklyn' or 'Central Park'."
+        ),
     )
     idempotency_id: UUID | None = Field(
         None,
@@ -142,6 +157,20 @@ class ManageMemoryArgs(BaseModel):
             "logical create. Omit for a fresh create."
         ),
     )
+
+    @field_validator("event_time", mode="before")
+    @classmethod
+    def _strip_event_time_tz_suffix(cls, v: Any) -> Any:
+        """gpt-4o-mini routinely emits 'HH:MM:SS Z' or 'HH:MM:SS+00:00' for
+        event_time despite the prompt forbidding it. Normalize at the schema
+        boundary so DB storage + JSON wire format are always naked HH:MM:SS.
+        The IANA timezone lives in `event_tz`.
+        """
+        if isinstance(v, str):
+            return re.sub(r"(Z|[+-]\d{2}:?\d{2}(:?\d{2})?)$", "", v)
+        if isinstance(v, time):
+            return v.replace(tzinfo=None)
+        return v
 
     @model_validator(mode="after")
     def _per_action_required(self) -> "ManageMemoryArgs":

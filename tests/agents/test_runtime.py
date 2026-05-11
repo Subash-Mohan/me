@@ -40,12 +40,23 @@ async def test_run_agent_stream_emits_packets_for_simple_text_turn(db, monkeypat
             return _FakeStreamed()
 
     monkeypatch.setattr(runtime, "Runner", _FakeRunner)
-    monkeypatch.setattr(runtime, "build_agent", lambda emitter: (object(), {}))
+    monkeypatch.setattr(
+        runtime,
+        "build_agent",
+        lambda emitter, *, now_utc, client_tz: (object(), {}),
+    )
 
     from app.agents.runtime import run_agent_stream
 
     packets = []
-    async for pkt in run_agent_stream("hi", db=db, memory_client=fake_client, user=user):
+    async for pkt in run_agent_stream(
+        "hi",
+        db=db,
+        memory_client=fake_client,
+        user=user,
+        now_utc="2026-05-09T16:00:00+00:00",
+        client_tz="UTC",
+    ):
         packets.append(pkt)
 
     types = [p.type for p in packets]

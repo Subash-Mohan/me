@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.agents.context import AgentContext
 from app.agents.emitter import Emitter
-from app.agents.instructions import CHAT_SYSTEM_PROMPT
+from app.agents.instructions import render_system_prompt
 from app.agents.packets import ErrorPacket, RunDonePacket
 from app.agents.sse import _dispatch_tool_start, translate_framework
 from app.agents.tools import ALL_TOOL_CLASSES, Packet
@@ -44,7 +44,12 @@ def _adapt(tool: Tool) -> FunctionTool:
     )
 
 
-def build_agent(emitter: Emitter) -> tuple[Agent[AgentContext], dict[str, Tool]]:
+def build_agent(
+    emitter: Emitter,
+    *,
+    now_utc: str,
+    client_tz: str,
+) -> tuple[Agent[AgentContext], dict[str, Tool]]:
     settings = get_settings()
     client = AsyncOpenAI(
         api_key=settings.openrouter_api_key.get_secret_value(),
@@ -57,7 +62,7 @@ def build_agent(emitter: Emitter) -> tuple[Agent[AgentContext], dict[str, Tool]]
     tools = {cls.NAME: cls(emitter=emitter) for cls in ALL_TOOL_CLASSES}
     agent: Agent[AgentContext] = Agent(
         name="me-chat",
-        instructions=CHAT_SYSTEM_PROMPT,
+        instructions=render_system_prompt(now_utc=now_utc, client_tz=client_tz),
         model=model,
         tools=[_adapt(t) for t in tools.values()],
     )
@@ -69,10 +74,13 @@ async def run_agent_stream(
     db: Session,
     memory_client: MemoryClient,
     user: User,
+    *,
+    now_utc: str,
+    client_tz: str,
 ) -> AsyncIterator[Packet]:
     queue: asyncio.Queue = asyncio.Queue()
     emitter = Emitter(queue, asyncio.get_running_loop())
-    agent, tools = build_agent(emitter)
+    agent, tools = build_agent(emitter, now_utc=now_utc, client_tz=client_tz)
     ctx = AgentContext(db=db, memory_client=memory_client, user=user, emitter=emitter)
 
     async def drive() -> None:
