@@ -15,8 +15,10 @@ def reset_db() -> None:
         f"reset_db() refuses to run against {db_name!r} — DB name must end with _test"
     )
     with engine.begin() as conn:
-        # Explicit per table — `users` cascades to `memories` via FK, but spelling
-        # both out keeps the dependency direction obvious if FKs ever change.
+        # Explicit per table — `users` cascades down via FK, but spelling each
+        # out keeps the dependency direction obvious if FKs ever change.
+        conn.execute(text("TRUNCATE TABLE messages CASCADE"))
+        conn.execute(text("TRUNCATE TABLE sessions CASCADE"))
         conn.execute(text("TRUNCATE TABLE memories CASCADE"))
         conn.execute(text("TRUNCATE TABLE users RESTART IDENTITY CASCADE"))
 
@@ -81,3 +83,59 @@ def seed_memory(
         session.add(memory)
         session.commit()
         return memory.id
+
+
+def seed_session(
+    *,
+    user_id: UUID,
+    title: str | None = None,
+    **overrides: Any,
+) -> UUID:
+    """Insert a Session row directly via the ORM and return its id."""
+    from datetime import UTC, datetime
+
+    from app.models.session import Session
+
+    fields: dict[str, Any] = {
+        "user_id": user_id,
+        "title": title,
+        "last_message_at": datetime.now(UTC),
+    }
+    fields.update(overrides)
+
+    with SessionLocal() as session:
+        row = Session(**fields)
+        session.add(row)
+        session.commit()
+        return row.id
+
+
+def seed_message(
+    *,
+    user_id: UUID,
+    session_id: UUID,
+    role: str = "user",
+    content: str = "seed content",
+    parent_message_id: UUID | None = None,
+    **overrides: Any,
+) -> UUID:
+    """Insert a Message row directly via the ORM and return its id.
+
+    Bypasses the service layer so tests can set arbitrary `created_at`,
+    `parent_message_id`, or `tool_activity` to exercise edge cases."""
+    from app.models.message import Message
+
+    fields: dict[str, Any] = {
+        "user_id": user_id,
+        "session_id": session_id,
+        "role": role,
+        "content": content,
+        "parent_message_id": parent_message_id,
+    }
+    fields.update(overrides)
+
+    with SessionLocal() as session:
+        row = Message(**fields)
+        session.add(row)
+        session.commit()
+        return row.id

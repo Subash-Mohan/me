@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr
     openrouter_default_model: str
 
+    chat_history_turns: int = 10
+
     @field_validator("supermemory_base_url")
     @classmethod
     def _strip_trailing_slash(cls, v: str) -> str:

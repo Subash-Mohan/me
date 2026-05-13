@@ -133,3 +133,23 @@ With caching on, a logger created at module import (when conftest sets `LOG_LEVE
 **Choice:** None-from-LLM on `update` is treated as "omitted" (mapped to `_UNSET`), not "set to NULL". Implemented in `_unset_unprovided` at `app/agents/tools/memory.py`.
 **Why:** The LLM cannot natively express the difference between "I'm not setting this" and "I'm clearing this". Clearing is rare in this app.
 **Alternatives considered:** Add a `clear_fields: list[str]` arg — defer until a real need shows up.
+
+## 2026-05-11 — chat session/message persistence shape
+**Choice:** Two tables — `sessions` and `messages`. Roles are `user` and `assistant` only; tool activity rides on the assistant row as a single `tool_activity JSONB` column. Assistant rows link to their triggering user row via `parent_message_id` (partial UNIQUE).
+**Why:** A separate `tool_call` / `tool_result` row schema would double the row count per turn for journaling-style traffic and force every read of a session to JOIN tool rows. The UI only needs to display "what the user typed" + "what the assistant said"; tool activity is supporting context, not a first-class entity. `parent_message_id` keeps the door open to multiple regenerated assistant replies later (drop the partial UNIQUE on `WHERE … deleted_at IS NULL` and you immediately get a 1:N history).
+**Alternatives considered:** OpenAI-style four-role schema (`user`/`assistant`/`tool_call`/`tool_result`); embedding tool activity inside a JSONB column on the user row (less clean — assistant text was no longer first-class).
+
+## 2026-05-11 — client UUID is the user-message PK with full replay
+**Choice:** `POST /chat` requires `client_message_id: UUID`. The user-message row's PK is that UUID. On dup with an existing assistant row, the endpoint replays the cached text as a single `TextDeltaPacket` + `RunDonePacket` over SSE and does not invoke the agent. On dup without one (prior failure), the agent runs again.
+**Why:** CLAUDE.md cross-cutting rule 2 requires "Client supplies a UUID per chat message; backend upserts on it." Full-replay is the most useful interpretation — it lets a flaky-network client retry without double-charging the agent or double-running tool side effects. The `ManageMemoryTool`'s existing `idempotency_id` covers double-create on the no-cache retry path.
+**Alternatives considered:** Short-window-only dedupe (simpler, but no replay guarantee); pending-state lock + 409 on retry (needs a stale-runs sweeper, doesn't match the user's "fail loud, manual retry" preference).
+
+## 2026-05-11 — in-session-only history; cross-session = cold agent
+**Choice:** The chat endpoint loads the last `chat_history_turns=10` user+assistant pairs from the *current* session and prepends them to the agent input. The agent has no awareness of other sessions. Instructions now read "current conversation only" instead of "no memory across turns."
+**Why:** Matches the journaling product framing — memories are the long-term truth (via `search_memories`), and a chat session is one bounded conversation. Cross-session context-window growth would be unbounded and would mix unrelated threads. Within a session the user gets natural multi-turn dialogue.
+**Alternatives considered:** Token-budgeted history (deferred — needs a tokenizer wiring); entire-session history (unbounded); no history at all (forces every clarification to re-search memories).
+
+## 2026-05-11 — no durable mid-stream recovery for chat runs
+**Choice:** If `run_agent_stream` emits an `ErrorPacket` or raises, the endpoint surfaces the error packet and does not write an assistant row. The user message row stays. Retry is the client's job (sending the same `client_message_id` re-runs the agent).
+**Why:** The user explicitly chose "fail loud, manual retry" over either pending-state tracking or delta-streaming-to-DB. Both alternatives carry persistent in-flight state that needs sweeping when the server crashes.
+**Alternatives considered:** Persist deltas as they stream + resume after disconnect (needs run-resumption from the Agents SDK, which doesn't advertise it); mark the user_message as `status=running` and 409 on retry until resolved (adds a stale-runs sweeper / TTL).
