@@ -67,9 +67,9 @@ class _FakeRuntime:
 
 
 def _install_fake_runtime(monkeypatch: pytest.MonkeyPatch, fake: _FakeRuntime) -> None:
-    import app.api.chat as chat_module
+    import app.api._chat_stream as chat_stream
 
-    monkeypatch.setattr(chat_module, "run_agent_stream", fake)
+    monkeypatch.setattr(chat_stream, "run_agent_stream", fake)
 
 
 def _create_session(client: TestClient, headers: dict[str, str]) -> UUID:

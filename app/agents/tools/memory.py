@@ -1,12 +1,13 @@
 import asyncio
 import re
 from datetime import date, time
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.agents.context import AgentContext
+from app.agents.packets import ToolCallPacket, ToolEndPacket
 from app.agents.tools._base import Tool
 from app.services import memory as memory_service
 
@@ -33,18 +34,16 @@ class SearchMemoriesStartPacket(BaseModel):
     tool_call_id: str
 
 
-class SearchMemoriesCallPacket(BaseModel):
+class SearchMemoriesCallPacket(ToolCallPacket):
     type: Literal["search_memories_call"] = "search_memories_call"
-    tool_call_id: str
     arguments: SearchMemoriesArgs
+    tool_name: ClassVar[str] = "search_memories"
 
 
-class SearchMemoriesEndPacket(BaseModel):
+class SearchMemoriesEndPacket(ToolEndPacket):
     type: Literal["search_memories_end"] = "search_memories_end"
-    tool_call_id: str
-    status: Literal["ok", "error"]
     result: SearchMemoriesResult | None = None
-    error: str | None = None
+    tool_name: ClassVar[str] = "search_memories"
 
 
 class SearchMemoriesTool(Tool[SearchMemoriesArgs, SearchMemoriesResult]):
@@ -201,18 +200,16 @@ class ManageMemoryStartPacket(BaseModel):
     tool_call_id: str
 
 
-class ManageMemoryCallPacket(BaseModel):
+class ManageMemoryCallPacket(ToolCallPacket):
     type: Literal["manage_memory_call"] = "manage_memory_call"
-    tool_call_id: str
     arguments: ManageMemoryArgs
+    tool_name: ClassVar[str] = "manage_memory"
 
 
-class ManageMemoryEndPacket(BaseModel):
+class ManageMemoryEndPacket(ToolEndPacket):
     type: Literal["manage_memory_end"] = "manage_memory_end"
-    tool_call_id: str
-    status: Literal["ok", "error"]
     result: MemoryDetailResult | DeletedResult | None = None
-    error: str | None = None
+    tool_name: ClassVar[str] = "manage_memory"
 
 
 def _unset_unprovided(args: ManageMemoryArgs) -> dict:
