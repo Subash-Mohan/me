@@ -30,9 +30,9 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ["Outfit-Regular"],
-        sansMedium: ["Outfit-Medium"],
-        serif: ["CormorantGaramond-LightItalic"],
+        sans: ["Outfit_400Regular"],
+        sansMedium: ["Outfit_500Medium"],
+        serif: ["CormorantGaramond_300Light_Italic"],
       },
       borderRadius: {
         lg: "8px",
