@@ -45,6 +45,7 @@ Everything else (memory storage/retrieval, chat capture/recall, reminders, image
 | Memory | Supermemory API | same |
 | Object storage | Local FS under `./var/images/` | TBD |
 | LLM | OpenRouter (OpenAI SDK pointed at it) | same |
+| Mobile client | Expo SDK 54 + RN 0.81 + Expo Router v6 + NativeWind v4 (Tailwind 3.4) in `mobile/`, pnpm workspace | same |
 | Hosting | local | TBD |
 
 Single-user app. Prod choices (DB host, storage, hosting, push) get resolved in their own phases.
@@ -69,8 +70,11 @@ Single-user app. Prod choices (DB host, storage, hosting, push) get resolved in 
 ├── migrations/         # Alembic
 ├── tests/              # pytest (real Postgres, no DB mocks)
 ├── docker/             # Dockerfile, docker-compose.yml
+├── mobile/             # Expo + RN + NativeWind client (pnpm workspace)
 ├── Plans/phases/       # per-phase plans (currently empty)
 ├── DECISIONS.md
+├── package.json        # pnpm workspace root
+├── pnpm-workspace.yaml
 └── pyproject.toml
 ```
 

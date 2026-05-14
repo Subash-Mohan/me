@@ -38,3 +38,14 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# JS / Expo
+node_modules/
+mobile/.expo/
+mobile/.expo-shared/
+mobile/dist/
+mobile/web-build/
+mobile/ios/
+mobile/android/
+*.tsbuildinfo
+.pnpm-store/
