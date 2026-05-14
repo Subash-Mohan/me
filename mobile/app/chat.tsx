@@ -1,10 +1,12 @@
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatInput } from "@/components/chat/chat-input";
 import { MessageList } from "@/components/chat/message-list";
-import { MOCK_MEMORIES, MOCK_MESSAGES } from "@/constants/mock-data";
+import { MOCK_MESSAGES } from "@/constants/mock-data";
+import { useAddMemory } from "@/lib/memory-store";
 import type { MemoryCard, Message } from "@/lib/types";
 
 const AI_REPLY_DELAY_MS = 400;
@@ -12,9 +14,10 @@ const AI_TYPING_MS = 1500;
 const MEMORY_TRIGGER_TEXT_LENGTH = 20;
 
 export default function ChatScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const addMemory = useAddMemory();
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
-  const [, setMemories] = useState<MemoryCard[]>(MOCK_MEMORIES);
   const [isTyping, setIsTyping] = useState(false);
 
   const handleSend = (text: string, images?: string[], date?: Date) => {
@@ -49,7 +52,7 @@ export default function ChatScreen() {
             image: images?.[0],
             location: "Near Current Location",
           };
-          setMemories((prev) => [memory, ...prev]);
+          addMemory(memory);
 
           const aiMsg: Message = {
             id: (Date.now() + 1).toString(),
@@ -76,7 +79,10 @@ export default function ChatScreen() {
   return (
     <View className="flex-1 bg-[#121212]">
       <MessageList messages={messages} isTyping={isTyping} />
-      <ChatHeader topInset={insets.top} />
+      <ChatHeader
+        topInset={insets.top}
+        onLogsPress={() => router.push("/logs")}
+      />
       <ChatInput onSend={handleSend} bottomInset={insets.bottom} />
     </View>
   );
