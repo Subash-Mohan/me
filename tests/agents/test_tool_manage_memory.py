@@ -12,13 +12,12 @@ import pytest
 
 from app.agents.context import AgentContext
 from app.agents.tools.memory import (
-    DeletedResult,
     ManageMemoryArgs,
     ManageMemoryTool,
     MemoryDetailResult,
 )
 from app.models.user import User
-from tests._db import reset_db, seed_memory, seed_owner
+from tests._db import reset_db, seed_owner
 from tests._memory_client_fake import FakeMemoryClient
 
 
@@ -58,22 +57,6 @@ async def test_create_emits_call_and_end_ok(db, owner_id):
         "manage_memory_call",
         "manage_memory_end",
     ]
-    assert emitter.packets[-1].status == "ok"
-
-
-@pytest.mark.asyncio
-async def test_delete_emits_call_and_end_ok(db, owner_id):
-    user = db.get(User, owner_id)
-    mid = seed_memory(user_id=owner_id, text_body="x", event_date=date(2026, 5, 1))
-    fake = FakeMemoryClient()
-    emitter = _ListEmitter()
-    ctx = AgentContext(db=db, memory_client=fake, user=user, emitter=emitter)
-    tool = ManageMemoryTool(emitter=emitter)
-
-    result = await tool.run(ctx, "tc_2", ManageMemoryArgs(action="delete", memory_id=mid))
-
-    assert isinstance(result, DeletedResult)
-    assert result.memory_id == mid
     assert emitter.packets[-1].status == "ok"
 
 

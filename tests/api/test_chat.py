@@ -160,15 +160,15 @@ def test_chat_records_tool_activity_on_assistant_row(
     client_message_id = uuid4()
 
     fake_args = ManageMemoryArgs(
-        action="delete",
+        action="update",
         memory_id=uuid4(),
     )
-    deleted_result = MemoryDetailResult(memory={"id": "x"})
+    update_result = MemoryDetailResult(memory={"id": "x"})
 
     def script() -> list[Any]:
         return [
             ManageMemoryCallPacket(tool_call_id="tc1", arguments=fake_args),
-            ManageMemoryEndPacket(tool_call_id="tc1", status="ok", result=deleted_result),
+            ManageMemoryEndPacket(tool_call_id="tc1", status="ok", result=update_result),
             TextDeltaPacket(delta="done"),
             RunDonePacket(reason="stop"),
         ]

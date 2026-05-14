@@ -1,7 +1,7 @@
 import asyncio
 import re
 from datetime import date, time
-from typing import Annotated, Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -97,13 +97,13 @@ class SearchMemoriesTool(Tool[SearchMemoriesArgs, SearchMemoriesResult]):
 
 
 class ManageMemoryArgs(BaseModel):
-    action: Literal["create", "update", "delete"] = Field(
+    action: Literal["create", "update"] = Field(
         description=(
-            "create: record a new memory. update/delete: modify or remove an "
-            "existing one — call search_memories first to find the memory_id."
+            "create: record a new memory. update: modify an existing one — "
+            "call search_memories first to find the memory_id."
         )
     )
-    memory_id: UUID | None = Field(None, description="Required for update and delete.")
+    memory_id: UUID | None = Field(None, description="Required for update.")
     text: str | None = Field(
         None,
         description=(
@@ -177,22 +177,14 @@ class ManageMemoryArgs(BaseModel):
             self.text is None or self.event_date is None or self.event_tz is None
         ):
             raise ValueError("create requires text, event_date, event_tz")
-        if self.action in ("update", "delete") and self.memory_id is None:
-            raise ValueError(f"{self.action} requires memory_id")
+        if self.action == "update" and self.memory_id is None:
+            raise ValueError("update requires memory_id")
         return self
 
 
 class MemoryDetailResult(BaseModel):
     kind: Literal["memory"] = "memory"
     memory: dict  # MemoryDetail.model_dump(mode="json")
-
-
-class DeletedResult(BaseModel):
-    kind: Literal["deleted"] = "deleted"
-    memory_id: UUID
-
-
-ManageMemoryResult = Annotated[MemoryDetailResult | DeletedResult, Field(discriminator="kind")]
 
 
 class ManageMemoryStartPacket(BaseModel):
@@ -208,7 +200,7 @@ class ManageMemoryCallPacket(ToolCallPacket):
 
 class ManageMemoryEndPacket(ToolEndPacket):
     type: Literal["manage_memory_end"] = "manage_memory_end"
-    result: MemoryDetailResult | DeletedResult | None = None
+    result: MemoryDetailResult | None = None
     tool_name: ClassVar[str] = "manage_memory"
 
 
@@ -232,13 +224,13 @@ def _unset_unprovided(args: ManageMemoryArgs) -> dict:
     return out
 
 
-class ManageMemoryTool(Tool[ManageMemoryArgs, MemoryDetailResult | DeletedResult]):
+class ManageMemoryTool(Tool[ManageMemoryArgs, MemoryDetailResult]):
     NAME = "manage_memory"
     DESCRIPTION = (
-        "Create, update, or delete one of the user's memories. Use `create` to "
-        "record a new event, `update` to edit an existing one (find memory_id "
-        "via `search_memories` first), or `delete` to remove one. Always pass "
-        "event_tz as an IANA TZ string (e.g. 'America/New_York')."
+        "Create or update one of the user's memories. Use `create` to record a "
+        "new event, or `update` to edit an existing one (find memory_id via "
+        "`search_memories` first). Always pass event_tz as an IANA TZ string "
+        "(e.g. 'America/New_York')."
     )
     ARGS_MODEL = ManageMemoryArgs
     START_PACKET = ManageMemoryStartPacket
@@ -250,7 +242,7 @@ class ManageMemoryTool(Tool[ManageMemoryArgs, MemoryDetailResult | DeletedResult
         ctx: AgentContext,
         tool_call_id: str,
         args: ManageMemoryArgs,
-    ) -> MemoryDetailResult | DeletedResult:
+    ) -> MemoryDetailResult:
         from app.schemas.memory import MemoryDetail
 
         self.emit_call(tool_call_id, args)
@@ -275,11 +267,7 @@ class ManageMemoryTool(Tool[ManageMemoryArgs, MemoryDetailResult | DeletedResult
                     location_label=args.location_label,
                     idempotency_id=args.idempotency_id,
                 )
-                detail = MemoryDetail.model_validate(row, from_attributes=True)
-                result: MemoryDetailResult | DeletedResult = MemoryDetailResult(
-                    memory=detail.model_dump(mode="json")
-                )
-            elif args.action == "update":
+            else:  # update
                 assert args.memory_id is not None
                 row = await asyncio.to_thread(
                     memory_service.update_memory,
@@ -289,18 +277,8 @@ class ManageMemoryTool(Tool[ManageMemoryArgs, MemoryDetailResult | DeletedResult
                     memory_id=args.memory_id,
                     **_unset_unprovided(args),
                 )
-                detail = MemoryDetail.model_validate(row, from_attributes=True)
-                result = MemoryDetailResult(memory=detail.model_dump(mode="json"))
-            else:
-                assert args.memory_id is not None
-                await asyncio.to_thread(
-                    memory_service.delete_memory,
-                    ctx.db,
-                    ctx.memory_client,
-                    user_id=ctx.user.id,
-                    memory_id=args.memory_id,
-                )
-                result = DeletedResult(memory_id=args.memory_id)
+            detail = MemoryDetail.model_validate(row, from_attributes=True)
+            result = MemoryDetailResult(memory=detail.model_dump(mode="json"))
         except Exception as exc:
             self.emit_end_error(tool_call_id, type(exc).__name__)
             raise
