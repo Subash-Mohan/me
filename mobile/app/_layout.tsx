@@ -10,7 +10,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAppFonts } from "@/hooks/use-app-fonts";
 import { AuthProvider } from "@/lib/auth/auth-store";
-import { MemoryProvider } from "@/lib/memory-store";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -42,24 +41,22 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <MemoryProvider>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  animation: "fade",
-                  contentStyle: { backgroundColor: "#121212" },
-                }}
-              >
-                <Stack.Screen name="index" />
-                <Stack.Screen name="login" />
-                <Stack.Screen name="chat" />
-                <Stack.Screen
-                  name="logs"
-                  options={{ animation: "slide_from_right" }}
-                />
-              </Stack>
-              <StatusBar style="light" />
-            </MemoryProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: "fade",
+                contentStyle: { backgroundColor: "#121212" },
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="login" />
+              <Stack.Screen name="chat" />
+              <Stack.Screen
+                name="logs"
+                options={{ animation: "slide_from_right" }}
+              />
+            </Stack>
+            <StatusBar style="light" />
           </AuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

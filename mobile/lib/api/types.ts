@@ -61,6 +61,23 @@ export type SessionListResponse = {
   next_cursor: string | null;
 };
 
+// ─── Memories resource ────────────────────────────────────────────────────
+
+export type ExternalStatus = "synced" | "unsynced" | "pending_delete";
+
+export type ServerMemoryCard = {
+  id: string;
+  event_date: string; // ISO date "YYYY-MM-DD"
+  location_label: string | null;
+  text_preview: string;
+  external_status: ExternalStatus;
+};
+
+export type MemoryListResponse = {
+  items: ServerMemoryCard[];
+  next_cursor: string | null;
+};
+
 // ─── SSE packet payloads (the `data:` JSON for each `event:` line) ────────
 
 export type StartPayload = {

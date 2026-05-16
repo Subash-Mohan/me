@@ -104,10 +104,15 @@ export function useChatHistory(sessionId: string | null): UseChatHistory {
             };
           }
           const [first, ...rest] = old.pages;
+          // Drop any stale row a racing GET may have left in the cache with
+          // the same id — the freshly-committed pair is authoritative.
+          const filtered = first.items.filter(
+            (m) => m.id !== user.id && m.id !== assistant.id,
+          );
           return {
             ...old,
             pages: [
-              { ...first, items: [assistant, user, ...first.items] },
+              { ...first, items: [assistant, user, ...filtered] },
               ...rest,
             ],
           };

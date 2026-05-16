@@ -63,13 +63,20 @@ export function useChat(): UseChat {
   // (per chunk during streaming). Inlined into this memo since memoising
   // it on its own buys nothing — the dependency would invalidate at the
   // same time as this one.
-  const messages = useMemo(
-    () =>
-      stream.activeTurn
-        ? [...historyMessages, ...adaptActiveTurn(stream.activeTurn)]
-        : historyMessages,
-    [historyMessages, stream.activeTurn],
-  );
+  //
+  // History may already contain rows with the same ids as the active turn
+  // (the backend upserts the user row as soon as POST /chat arrives, and
+  // a racing GET /sessions/{id}/messages can pull it back in before the
+  // stream finishes). The active turn is the authoritative live copy, so
+  // suppress any matching history entry while it's in flight.
+  const messages = useMemo(() => {
+    if (!stream.activeTurn) return historyMessages;
+    const { clientMessageId, assistantMessageId } = stream.activeTurn;
+    const filtered = historyMessages.filter(
+      (m) => m.id !== clientMessageId && m.id !== assistantMessageId,
+    );
+    return [...filtered, ...adaptActiveTurn(stream.activeTurn)];
+  }, [historyMessages, stream.activeTurn]);
 
   return {
     sessionId,

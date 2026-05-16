@@ -33,7 +33,11 @@ export function splitSseBlocks(
   chunk: string,
   leftover: string,
 ): { events: SseEvent[]; leftover: string } {
-  const buffer = leftover + chunk;
+  // SSE spec allows any of LF, CRLF, or lone CR as line terminators. The
+  // server (sse-starlette over uvicorn) emits CRLF, so without normalization
+  // the `\n\n` block separator is never found and every event sits in the
+  // leftover until EOF — the stream appears to "hang" client-side.
+  const buffer = (leftover + chunk).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const events: SseEvent[] = [];
 
   let cursor = 0;

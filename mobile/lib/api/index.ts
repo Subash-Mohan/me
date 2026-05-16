@@ -1,10 +1,12 @@
 import { authResource, type AuthResource } from "./auth";
 import { createApiClient, type ApiClientConfig } from "./client";
+import { memoriesResource, type MemoriesResource } from "./memories";
 import { sessionsResource, type SessionsResource } from "./sessions";
 
 export type Api = {
   auth: AuthResource;
   sessions: SessionsResource;
+  memories: MemoriesResource;
 };
 
 export function createApi(config: ApiClientConfig): Api {
@@ -12,6 +14,7 @@ export function createApi(config: ApiClientConfig): Api {
   return {
     auth: authResource(client),
     sessions: sessionsResource(client),
+    memories: memoriesResource(client),
   };
 }
 

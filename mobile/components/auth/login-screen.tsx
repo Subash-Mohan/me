@@ -20,18 +20,7 @@ const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const PHRASE_SEPARATOR = "-";
 
-type RowConfig = {
-  placeholder: string;
-  keyboardType: "default" | "number-pad";
-  autoCapitalize: "none" | "characters";
-};
-
-const ROWS: RowConfig[] = [
-  { placeholder: "Numbers", keyboardType: "number-pad", autoCapitalize: "none" },
-  { placeholder: "UPPERCASE", keyboardType: "default", autoCapitalize: "characters" },
-  { placeholder: "lowercase", keyboardType: "default", autoCapitalize: "none" },
-  { placeholder: "Alphanumeric", keyboardType: "default", autoCapitalize: "none" },
-];
+const PHRASE_LENGTH = 4;
 
 export function LoginScreen() {
   const router = useRouter();
@@ -150,11 +139,11 @@ export function LoginScreen() {
               style={{ width: "100%", marginBottom: 24 }}
             >
               <View style={{ gap: 12 }}>
-                {ROWS.map((row, i) => {
+                {phrase.map((_, i) => {
                   const focused = focusedIndex === i;
-                  const isLast = i === ROWS.length - 1;
+                  const isLast = i === PHRASE_LENGTH - 1;
                   return (
-                    <View key={row.placeholder} className="relative">
+                    <View key={i} className="relative">
                       <View
                         pointerEvents="none"
                         style={{
@@ -187,10 +176,8 @@ export function LoginScreen() {
                         onChangeText={(v) => handleChange(i, v)}
                         onFocus={() => setFocusedIndex(i)}
                         onBlur={() => setFocusedIndex(null)}
-                        placeholder={row.placeholder}
                         placeholderTextColor="rgba(212,212,206,0.35)"
-                        keyboardType={row.keyboardType}
-                        autoCapitalize={row.autoCapitalize}
+                        autoCapitalize="none"
                         autoCorrect={false}
                         spellCheck={false}
                         autoComplete="off"
