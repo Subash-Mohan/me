@@ -20,9 +20,6 @@ export default function ChatScreen() {
     }
   }, [authStatus, router]);
 
-  // v1: images + date picker are kept in the input UI but dropped here.
-  // The hook's contract is `(text)` only — keeping the screen honest about
-  // what actually reaches the backend.
   const handleSend = useCallback(
     (text: string) => {
       chat.sendMessage(text);

@@ -1,9 +1,6 @@
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
 import { BlurView } from "expo-blur";
 import * as ImagePicker from "expo-image-picker";
-import { Calendar, Mic, Plus } from "lucide-react-native";
+import { Mic, Plus } from "lucide-react-native";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -11,32 +8,28 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { DateChip } from "@/components/chat/date-chip";
 import { ImagePreviewRow } from "@/components/chat/image-preview-row";
 import { IconButton } from "@/components/ui/icon-button";
 
 type Props = {
-  onSend: (text: string, images?: string[], date?: Date) => void;
+  onSend: (text: string, images?: string[]) => void;
   bottomInset?: number;
 };
 
 export function ChatInput({ onSend, bottomInset = 0 }: Props) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<string[]>([]);
-  const [date, setDate] = useState<Date | undefined>(undefined);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   const hasContent = text.trim().length > 0 || images.length > 0;
 
   const reset = () => {
     setText("");
     setImages([]);
-    setDate(undefined);
   };
 
   const handleSend = () => {
     if (!hasContent) return;
-    onSend(text.trim(), images.length > 0 ? images : undefined, date);
+    onSend(text.trim(), images.length > 0 ? images : undefined);
     reset();
   };
 
@@ -50,12 +43,6 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
     if (!result.canceled) {
       setImages((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
     }
-  };
-
-  const onDateChange = (event: DateTimePickerEvent, selected?: Date) => {
-    if (Platform.OS !== "ios") setPickerOpen(false);
-    if (event.type === "set" && selected) setDate(selected);
-    if (event.type === "dismissed") setPickerOpen(false);
   };
 
   return (
@@ -82,18 +69,7 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
                 }
               />
             ) : null}
-            {date ? (
-              <DateChip date={date} onClear={() => setDate(undefined)} />
-            ) : null}
             <View className="flex-row items-center gap-3 px-2 py-1.5">
-              <IconButton
-                onPress={() => setPickerOpen(true)}
-                variant={date ? "filled-light" : "muted"}
-                size={48}
-                accessibilityLabel="Set date"
-              >
-                <Calendar size={22} color={date ? "#000" : "#D4D4CE"} />
-              </IconButton>
               <IconButton
                 onPress={pickImages}
                 variant="muted"
@@ -142,14 +118,6 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
           </View>
         </BlurView>
       </View>
-      {pickerOpen ? (
-        <DateTimePicker
-          value={date ?? new Date()}
-          mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={onDateChange}
-        />
-      ) : null}
     </KeyboardAvoidingView>
   );
 }
