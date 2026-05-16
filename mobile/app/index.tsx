@@ -6,7 +6,7 @@ export default function SplashRoute() {
   const router = useRouter();
 
   useEffect(() => {
-    const t = setTimeout(() => router.replace("/chat"), 2500);
+    const t = setTimeout(() => router.replace("/login"), 2500);
     return () => clearTimeout(t);
   }, [router]);
 

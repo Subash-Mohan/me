@@ -71,9 +71,9 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
         paddingBottom: bottomInset + 16,
       }}
     >
-      <View className="mx-4 overflow-hidden rounded-[28px] border border-border">
+      <View className="mx-4 overflow-hidden rounded-[32px] border border-border">
         <BlurView intensity={40} tint="dark" className="bg-surface-raised/85">
-          <View className="p-2">
+          <View className="p-2.5">
             {images.length > 0 ? (
               <ImagePreviewRow
                 images={images}
@@ -85,20 +85,22 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
             {date ? (
               <DateChip date={date} onClear={() => setDate(undefined)} />
             ) : null}
-            <View className="flex-row items-center gap-2.5 px-1 py-1">
+            <View className="flex-row items-center gap-3 px-2 py-1.5">
               <IconButton
                 onPress={() => setPickerOpen(true)}
                 variant={date ? "filled-light" : "muted"}
+                size={48}
                 accessibilityLabel="Set date"
               >
-                <Calendar size={14} color={date ? "#000" : "#D4D4CE"} />
+                <Calendar size={22} color={date ? "#000" : "#D4D4CE"} />
               </IconButton>
               <IconButton
                 onPress={pickImages}
                 variant="muted"
+                size={48}
                 accessibilityLabel="Attach image"
               >
-                <Plus size={16} color="#FFFFFF" strokeWidth={2.2} />
+                <Plus size={24} color="#FFFFFF" strokeWidth={2} />
               </IconButton>
               <TextInput
                 value={text}
@@ -106,7 +108,7 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
                 placeholder="Recall a moment..."
                 placeholderTextColor="rgba(212,212,206,0.45)"
                 className="flex-1 font-sans text-foreground-secondary"
-                style={{ fontSize: 14, paddingVertical: 4 }}
+                style={{ fontSize: 16, paddingVertical: 8 }}
                 onSubmitEditing={handleSend}
                 returnKeyType="send"
                 multiline={false}
@@ -115,20 +117,25 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
                 <IconButton
                   onPress={handleSend}
                   variant="filled-light"
+                  size={48}
                   accessibilityLabel="Send"
                 >
                   <View
                     className="bg-black"
                     style={{
-                      width: 8,
-                      height: 8,
+                      width: 12,
+                      height: 12,
                       transform: [{ rotate: "45deg" }],
                     }}
                   />
                 </IconButton>
               ) : (
-                <IconButton variant="muted" accessibilityLabel="Record audio">
-                  <Mic size={14} color="#FFFFFF" />
+                <IconButton
+                  variant="muted"
+                  size={48}
+                  accessibilityLabel="Record audio"
+                >
+                  <Mic size={22} color="#FFFFFF" />
                 </IconButton>
               )}
             </View>
