@@ -47,7 +47,7 @@ def create(
 
 
 @router.get("", response_model=SessionListResponse)
-def list_(
+def list_items(
     user: Annotated[User, Depends(current_user)],
     db: Annotated[DbSession, Depends(get_db)],
     cursor: Annotated[str | None, Query()] = None,

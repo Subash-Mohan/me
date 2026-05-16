@@ -98,7 +98,7 @@ def create(
 
 
 @router.get("", response_model=MemoryListResponse)
-def list_(
+def list_items(
     user: Annotated[User, Depends(current_user)],
     db: Annotated[Session, Depends(get_db)],
     from_date: Annotated[str | None, Query()] = None,
@@ -179,7 +179,7 @@ def detail(
 
 
 @router.patch("/{memory_id}", response_model=MemoryDetail)
-def patch(
+def update(
     memory_id: UUID,
     body: MemoryPatch,
     user: Annotated[User, Depends(current_user)],

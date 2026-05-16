@@ -13,8 +13,12 @@ import {
 import { Easing } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PrimaryButton } from "@/components/ui/primary-button";
+import { HttpError } from "@/lib/api";
+import { useAuth } from "@/lib/auth/auth-store";
 
 const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+const PHRASE_SEPARATOR = "-";
 
 type RowConfig = {
   placeholder: string;
@@ -32,13 +36,18 @@ const ROWS: RowConfig[] = [
 export function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { login } = useAuth();
   const [phrase, setPhrase] = useState<string[]>(["", "", "", ""]);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputsRef = useRef<(TextInput | null)[]>([null, null, null, null]);
 
   const isComplete = phrase.every((word) => word.trim().length > 0);
+  const canSubmit = isComplete && !submitting;
 
   const handleChange = (index: number, value: string) => {
+    if (error) setError(null);
     setPhrase((prev) => {
       const next = [...prev];
       next[index] = value;
@@ -46,9 +55,27 @@ export function LoginScreen() {
     });
   };
 
-  const handleSubmit = () => {
-    if (!isComplete) return;
-    router.replace("/chat");
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    const passphrase = phrase.map((s) => s.trim()).join(PHRASE_SEPARATOR);
+    setSubmitting(true);
+    setError(null);
+    try {
+      await login(passphrase);
+      router.replace("/chat");
+    } catch (err) {
+      if (err instanceof HttpError) {
+        setError(
+          err.status === 401
+            ? "Invalid recovery key."
+            : `Server rejected the request (${err.status}).`,
+        );
+      } else {
+        setError("Couldn't reach the server. Check your connection.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -120,7 +147,7 @@ export function LoginScreen() {
                 delay: 300,
                 easing: Easing.bezier(...EASE_OUT),
               }}
-              style={{ width: "100%", marginBottom: 40 }}
+              style={{ width: "100%", marginBottom: 24 }}
             >
               <View style={{ gap: 12 }}>
                 {ROWS.map((row, i) => {
@@ -167,11 +194,12 @@ export function LoginScreen() {
                         autoCorrect={false}
                         spellCheck={false}
                         autoComplete="off"
+                        editable={!submitting}
                         returnKeyType={isLast ? "done" : "next"}
                         onSubmitEditing={() => {
                           if (isLast) {
                             Keyboard.dismiss();
-                            handleSubmit();
+                            void handleSubmit();
                           } else {
                             inputsRef.current[i + 1]?.focus();
                           }
@@ -187,6 +215,18 @@ export function LoginScreen() {
               </View>
             </MotiView>
 
+            <View style={{ width: "100%", minHeight: 20, marginBottom: 16 }}>
+              {error ? (
+                <Text
+                  accessibilityLiveRegion="polite"
+                  className="text-center font-sans"
+                  style={{ fontSize: 13, lineHeight: 18, color: "#E07A7A" }}
+                >
+                  {error}
+                </Text>
+              ) : null}
+            </View>
+
             <MotiView
               from={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -199,9 +239,9 @@ export function LoginScreen() {
               style={{ width: "100%" }}
             >
               <PrimaryButton
-                label="Access Memory"
-                onPress={handleSubmit}
-                disabled={!isComplete}
+                label={submitting ? "Verifying…" : "Access Memory"}
+                onPress={() => void handleSubmit()}
+                disabled={!canSubmit}
               />
             </MotiView>
           </View>

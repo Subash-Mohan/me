@@ -7,7 +7,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.core.security import client_ip, current_user, mint_access_token, verify_passphrase
+from app.core.security import (
+    client_ip,
+    current_user,
+    mint_access_token,
+)
+from app.core.security import (
+    verify_passphrase as check_passphrase,
+)
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, LoginResponse, MeResponse, VerifyPassphraseRequest
@@ -31,7 +38,7 @@ def login(
 ) -> LoginResponse:
     ip = client_ip(request)
     user = db.execute(select(User).limit(1)).scalar_one_or_none()
-    if user is None or not verify_passphrase(body.passphrase, user.passphrase_hash):
+    if user is None or not check_passphrase(body.passphrase, user.passphrase_hash):
         log.info("auth.login_fail", ip=ip)
         raise _INVALID_CREDS
 
@@ -50,13 +57,13 @@ def me(user: Annotated[User, Depends(current_user)]) -> MeResponse:
 
 
 @router.post("/verify-passphrase", status_code=204)
-def verify_passphrase_route(
+def verify_passphrase(
     body: VerifyPassphraseRequest,
     request: Request,
     user: Annotated[User, Depends(current_user)],
 ) -> Response:
     ip = client_ip(request)
-    if not verify_passphrase(body.passphrase, user.passphrase_hash):
+    if not check_passphrase(body.passphrase, user.passphrase_hash):
         log.info("auth.verify_fail", user_id=str(user.id), ip=ip)
         raise _INVALID_CREDS
 

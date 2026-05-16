@@ -50,7 +50,8 @@
       "router": {},
       "eas": {
         "projectId": "78f38e1c-58a5-485e-95ba-d3240587879e"
-      }
+      },
+      "apiBaseUrl": "http://127.0.0.1:8000"
     }
   }
 }

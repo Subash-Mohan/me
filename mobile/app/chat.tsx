@@ -1,11 +1,12 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatInput } from "@/components/chat/chat-input";
 import { MessageList } from "@/components/chat/message-list";
 import { MOCK_MESSAGES } from "@/constants/mock-data";
+import { useAuth } from "@/lib/auth/auth-store";
 import { useAddMemory } from "@/lib/memory-store";
 import type { MemoryCard, Message } from "@/lib/types";
 
@@ -17,8 +18,19 @@ export default function ChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const addMemory = useAddMemory();
+  const { status } = useAuth();
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
   const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login");
+    }
+  }, [status, router]);
+
+  if (status !== "authenticated") {
+    return <View className="flex-1 bg-[#121212]" />;
+  }
 
   const handleSend = (text: string, images?: string[], date?: Date) => {
     if (!text && (!images || images.length === 0)) return;
