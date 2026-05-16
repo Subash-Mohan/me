@@ -1,4 +1,4 @@
-import type { MemoryCard, Message } from "@/lib/types";
+import type { MemoryCard } from "@/lib/types";
 
 const HOUR = 1000 * 60 * 60;
 const DAY = HOUR * 24;
@@ -40,27 +40,5 @@ export const MOCK_MEMORIES: MemoryCard[] = [
     excerpt: "Quiet coffee at Elma's. Soft light pouring through the window.",
     tags: ["peace"],
     location: "Elma's Cafe, NY",
-  },
-];
-
-export const MOCK_MESSAGES: Message[] = [
-  {
-    id: "1",
-    sender: "ai",
-    text: "Welcome back. What's on your mind today?",
-    timestamp: new Date(now - DAY),
-  },
-  {
-    id: "2",
-    sender: "user",
-    text: "Quiet coffee at Elma's. Soft light pouring through the window.",
-    timestamp: new Date(now - HOUR * 2),
-  },
-  {
-    id: "3",
-    sender: "ai",
-    text: "I've filed that away for you. It sounds like a meaningful moment.",
-    timestamp: new Date(now - HOUR * 2),
-    memoryAdded: MOCK_MEMORIES[3],
   },
 ];

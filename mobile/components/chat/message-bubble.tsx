@@ -1,16 +1,43 @@
 import { Image } from "expo-image";
 import { MotiView } from "moti";
+import { memo } from "react";
 import { Text, View } from "react-native";
 import { MemoryCard } from "@/components/chat/memory-card";
 import { formatTime } from "@/lib/format";
 import type { Message } from "@/lib/types";
+
+function StreamingDot({ delay }: { delay: number }) {
+  return (
+    <MotiView
+      from={{ opacity: 0.3 }}
+      animate={{ opacity: 1 }}
+      transition={{
+        type: "timing",
+        duration: 600,
+        delay,
+        loop: true,
+        repeatReverse: true,
+      }}
+      className="h-1.5 w-1.5 rounded-full bg-white/50"
+    />
+  );
+}
 
 type Props = {
   message: Message;
   index: number;
 };
 
-export function MessageBubble({ message, index }: Props) {
+/**
+ * Memoised with the default shallow prop comparator. During a streaming
+ * turn the in-flight assistant message's `Message` reference changes on
+ * every render, so that bubble re-renders. Every other (stable history)
+ * bubble's reference stays identical across renders and is skipped.
+ */
+export const MessageBubble = memo(function MessageBubble({
+  message,
+  index,
+}: Props) {
   const isUser = message.sender === "user";
   const stagger = Math.min(index * 30, 200);
 
@@ -79,6 +106,12 @@ export function MessageBubble({ message, index }: Props) {
             {message.text}
           </Text>
         </View>
+      ) : message.isStreaming ? (
+        <View className="flex-row items-center gap-1.5 rounded-2xl rounded-tl-none border border-border-subtle bg-surface-raised px-4 py-4">
+          <StreamingDot delay={0} />
+          <StreamingDot delay={200} />
+          <StreamingDot delay={400} />
+        </View>
       ) : null}
 
       {message.memoryAdded ? <MemoryCard memory={message.memoryAdded} /> : null}
@@ -97,4 +130,4 @@ export function MessageBubble({ message, index }: Props) {
       ) : null}
     </MotiView>
   );
-}
+});

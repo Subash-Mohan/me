@@ -1,42 +1,28 @@
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import { MOCK_MEMORIES } from "@/constants/mock-data";
 import type { MemoryCard } from "@/lib/types";
 
-type MemoryStore = {
-  memories: MemoryCard[];
-  addMemory: (memory: MemoryCard) => void;
-};
-
-const MemoryContext = createContext<MemoryStore | null>(null);
+/**
+ * Read-only memory list for the logs screen. Currently sourced from
+ * `MOCK_MEMORIES`; the next phase will wire it to `GET /memories`.
+ *
+ * Memory creation now happens server-side via the agent's `manage_memory`
+ * tool — there's no FE-side `addMemory` anymore.
+ */
+const MemoryContext = createContext<MemoryCard[] | null>(null);
 
 export function MemoryProvider({ children }: { children: ReactNode }) {
-  const [memories, setMemories] = useState<MemoryCard[]>(MOCK_MEMORIES);
-
-  const addMemory = useCallback((memory: MemoryCard) => {
-    setMemories((prev) => [memory, ...prev]);
-  }, []);
-
-  const value = useMemo(() => ({ memories, addMemory }), [memories, addMemory]);
-
   return (
-    <MemoryContext.Provider value={value}>{children}</MemoryContext.Provider>
+    <MemoryContext.Provider value={MOCK_MEMORIES}>
+      {children}
+    </MemoryContext.Provider>
   );
 }
 
-function useStore(): MemoryStore {
+export function useMemories(): MemoryCard[] {
   const ctx = useContext(MemoryContext);
   if (!ctx) {
-    throw new Error("useMemories/useAddMemory must be used inside MemoryProvider");
+    throw new Error("useMemories must be used inside MemoryProvider");
   }
   return ctx;
 }
-
-export const useMemories = (): MemoryCard[] => useStore().memories;
-export const useAddMemory = (): MemoryStore["addMemory"] => useStore().addMemory;
