@@ -532,3 +532,62 @@ def test_chat_passes_session_history_to_runtime(
     contents = [h["content"] for h in history]
     assert roles == ["user", "assistant"]
     assert contents == ["first user", "ok"]
+
+
+def test_chat_persists_client_location_when_provided(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = auth_headers(client, PHRASE)
+    session_id = _create_session(client, headers)
+    cm = uuid4()
+
+    fake = _FakeRuntime(lambda: [TextDeltaPacket(delta="ok")])
+    _install_fake_runtime(monkeypatch, fake)
+
+    resp = client.post(
+        "/chat",
+        headers=headers,
+        json={
+            "session_id": str(session_id),
+            "client_message_id": str(cm),
+            "message": "hi from a place",
+            "client_tz": "Asia/Kolkata",
+            "client_location": {"lat": 12.9716, "lng": 77.5946},
+        },
+    )
+    assert resp.status_code == 200
+
+    db.expire_all()
+    user_row = db.get(Message, cm)
+    assert user_row is not None
+    assert user_row.location_lat == pytest.approx(12.9716)
+    assert user_row.location_lng == pytest.approx(77.5946)
+
+
+def test_chat_user_message_has_null_location_when_omitted(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = auth_headers(client, PHRASE)
+    session_id = _create_session(client, headers)
+    cm = uuid4()
+
+    fake = _FakeRuntime(lambda: [TextDeltaPacket(delta="ok")])
+    _install_fake_runtime(monkeypatch, fake)
+
+    resp = client.post(
+        "/chat",
+        headers=headers,
+        json={
+            "session_id": str(session_id),
+            "client_message_id": str(cm),
+            "message": "no location here",
+            "client_tz": "UTC",
+        },
+    )
+    assert resp.status_code == 200
+
+    db.expire_all()
+    user_row = db.get(Message, cm)
+    assert user_row is not None
+    assert user_row.location_lat is None
+    assert user_row.location_lng is None

@@ -15,6 +15,8 @@
 
 import { fetch } from "expo/fetch";
 
+import type { ClientLocation } from "@/lib/chat/location";
+
 import { HttpError, NetworkError } from "./errors";
 import type { PacketHandlers } from "./packet-router";
 import { routePacket } from "./packet-router";
@@ -25,6 +27,7 @@ export type StreamChatArgs = {
   clientMessageId: string;
   message: string;
   clientTz: string;
+  clientLocation: ClientLocation | null;
 };
 
 export type StreamChatOptions = {
@@ -57,6 +60,7 @@ export async function streamChat(
         client_message_id: args.clientMessageId,
         message: args.message,
         client_tz: args.clientTz,
+        client_location: args.clientLocation,
       }),
       signal: options.signal,
     });

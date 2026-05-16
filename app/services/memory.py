@@ -93,9 +93,10 @@ def _build_metadata(row: Memory) -> dict[str, str | float | bool | list[str]]:
     """Supermemory metadata envelope. Kept narrow — no nested dicts.
 
     Includes the event date (queryable), the timezone, the local creation
-    timestamp as unix seconds, and the human-readable location label when
-    present. Numeric coordinates and `event_time` are deliberately omitted;
-    they live only in the local row and are not exposed for vector search.
+    timestamp as unix seconds, the human-readable location label when
+    present, and the numeric coordinates when present (for future
+    map-based filtering). `event_time` is deliberately omitted; it lives
+    only in the local row.
     """
     metadata: dict[str, str | float | bool | list[str]] = {
         "event_date": row.event_date.isoformat(),
@@ -104,6 +105,9 @@ def _build_metadata(row: Memory) -> dict[str, str | float | bool | list[str]]:
     }
     if row.location_label:
         metadata["location_label"] = row.location_label
+    if row.location_lat is not None and row.location_lng is not None:
+        metadata["location_lat"] = row.location_lat
+        metadata["location_lng"] = row.location_lng
     return metadata
 
 

@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Text, text
+from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -52,6 +52,8 @@ class Message(Base):
         nullable=True,
     )
     client_tz: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -74,6 +76,10 @@ class Message(Base):
         CheckConstraint(
             "(role = 'user') OR (parent_message_id IS NOT NULL)",
             name="ck_messages_assistant_has_parent",
+        ),
+        CheckConstraint(
+            "(location_lat IS NULL) = (location_lng IS NULL)",
+            name="ck_messages_location_pair_set",
         ),
         Index(
             "ix_messages_session_created_at",

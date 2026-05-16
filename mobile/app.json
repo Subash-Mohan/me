@@ -40,7 +40,13 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Lets each chat message capture where you were when you wrote it."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

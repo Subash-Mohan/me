@@ -23,6 +23,7 @@ import { toolNameFromType } from "@/lib/api/packet-router";
 import type { ServerMessage } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth/auth-store";
 import { serverEventsFromTurn } from "@/lib/chat/adapter";
+import { getCurrentLocation } from "@/lib/chat/location";
 import {
   type ActiveTurn,
   type ChatAction,
@@ -182,27 +183,33 @@ export function useChatStream(onTurnComplete: OnTurnComplete): UseChatStream {
         signal: controller.signal,
       };
 
-      streamChat(
-        {
-          sessionId,
-          clientMessageId,
-          message: text,
-          clientTz: getTimezone(),
-        },
-        handlers,
-        options,
-      ).catch((err) => {
-        if (controller.signal.aborted) return; // user-initiated stop
-        const message =
-          err instanceof HttpError
-            ? `HTTP ${err.status}`
-            : err instanceof NetworkError
-              ? "network failure"
-              : err instanceof Error
-                ? err.message
-                : "unknown error";
-        dispatch({ type: "packet/error", code: "stream_failed", message });
-      });
+      void (async () => {
+        const clientLocation = await getCurrentLocation();
+        try {
+          await streamChat(
+            {
+              sessionId,
+              clientMessageId,
+              message: text,
+              clientTz: getTimezone(),
+              clientLocation,
+            },
+            handlers,
+            options,
+          );
+        } catch (err) {
+          if (controller.signal.aborted) return; // user-initiated stop
+          const message =
+            err instanceof HttpError
+              ? `HTTP ${err.status}`
+              : err instanceof NetworkError
+                ? "network failure"
+                : err instanceof Error
+                  ? err.message
+                  : "unknown error";
+          dispatch({ type: "packet/error", code: "stream_failed", message });
+        }
+      })();
     },
     [auth.session?.token],
   );

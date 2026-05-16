@@ -184,6 +184,30 @@ class TestCreateMemory:
         _, kwargs = memory_client.calls[0]
         assert kwargs["custom_id"] == row.id
         assert kwargs["container_tags"] == [f"user_{owner_id.hex}"]
+        # No location → coordinate keys absent from Supermemory metadata.
+        assert "location_lat" not in kwargs["metadata"]
+        assert "location_lng" not in kwargs["metadata"]
+
+    def test_pushes_coordinates_to_supermemory_metadata_when_present(
+        self, db: Session, owner_id: UUID, memory_client: FakeMemoryClient
+    ) -> None:
+        row = memory_service.create_memory(
+            db,
+            memory_client,
+            user_id=owner_id,
+            text="had coffee",
+            event_date=date(2026, 5, 16),
+            event_tz="Asia/Kolkata",
+            location_lat=12.9716,
+            location_lng=77.5946,
+            location_label="Bangalore",
+        )
+        assert row.location_lat == pytest.approx(12.9716)
+        _, kwargs = memory_client.calls[0]
+        meta = kwargs["metadata"]
+        assert meta["location_lat"] == pytest.approx(12.9716)
+        assert meta["location_lng"] == pytest.approx(77.5946)
+        assert meta["location_label"] == "Bangalore"
 
     def test_layer1_dedupe_returns_existing_on_repeat_idempotency_id(
         self, db: Session, owner_id: UUID, memory_client: FakeMemoryClient

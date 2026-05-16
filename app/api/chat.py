@@ -66,6 +66,7 @@ async def chat(
     except SessionNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "session not found") from exc
 
+    loc = body.client_location
     await asyncio.to_thread(
         record_user_message,
         db,
@@ -74,6 +75,8 @@ async def chat(
         client_message_id=body.client_message_id,
         content=body.message,
         client_tz=body.client_tz,
+        location_lat=loc.lat if loc is not None else None,
+        location_lng=loc.lng if loc is not None else None,
     )
 
     cached = await asyncio.to_thread(

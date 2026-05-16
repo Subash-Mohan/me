@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.models.message import Message
 from app.models.session import Session
+from app.services._memory_helpers import validate_location_pair
 
 log = structlog.get_logger(__name__)
 
@@ -262,6 +263,8 @@ def record_user_message(
     client_message_id: UUID,
     content: str,
     client_tz: str,
+    location_lat: float | None = None,
+    location_lng: float | None = None,
 ) -> Message:
     """Insert the user-message row keyed by `client_message_id`.
 
@@ -270,7 +273,14 @@ def record_user_message(
     bumped only on a fresh insert (re-stamping on every retry would skew
     sidebar ordering). Title is auto-filled from the first ~60 chars when
     `session.title` is null.
+
+    `location_lat` / `location_lng` capture the device's position at send
+    time; the pair must be both-or-neither (the DB check constraint enforces
+    it as well). The human-readable location label, when relevant, is the
+    agent's job — it extracts it from the message text into the `memories`
+    row, not here.
     """
+    validate_location_pair(location_lat, location_lng)
     stmt = (
         pg_insert(Message)
         .values(
@@ -280,6 +290,8 @@ def record_user_message(
             role="user",
             content=content,
             client_tz=client_tz,
+            location_lat=location_lat,
+            location_lng=location_lng,
         )
         .on_conflict_do_nothing(index_elements=["id"])
         .returning(Message.id)
