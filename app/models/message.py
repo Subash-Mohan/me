@@ -45,7 +45,7 @@ class Message(Base):
     )
     role: Mapped[Role] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    tool_activity: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    events: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     parent_message_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("messages.id", ondelete="CASCADE"),
@@ -68,8 +68,8 @@ class Message(Base):
             name="ck_messages_role",
         ),
         CheckConstraint(
-            "(role = 'assistant') OR (tool_activity IS NULL)",
-            name="ck_messages_tool_activity_assistant_only",
+            "(role = 'assistant') OR (events IS NULL)",
+            name="ck_messages_events_assistant_only",
         ),
         CheckConstraint(
             "(role = 'user') OR (parent_message_id IS NOT NULL)",

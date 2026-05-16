@@ -4,10 +4,12 @@ This is the project's only async route. Sync-route discipline is suspended
 here because the OpenAI Agents SDK streams from an async iterator; sync
 alternatives (threads + queues) trade readability for no benefit.
 
-Stream-folding state, SSE framing, and end-of-stream persistence live in
+Stream-folding state, packet framing, and end-of-stream persistence live in
 `app/api/_chat_stream.py`. This file is purely HTTP/DI orchestration:
 resolve session, record the user turn, decide replay-vs-fresh, hand the
-inputs to a streaming function.
+inputs to a streaming function. Framing on the wire is delegated to
+`sse_starlette.EventSourceResponse` (keep-alive pings, disconnect detection,
+buffering-disabled header for free).
 """
 
 import asyncio
@@ -16,8 +18,8 @@ from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session as DbSession
+from sse_starlette.sse import EventSourceResponse
 
 from app.api._chat_stream import ChatTurn, replay_stream, stream_turn
 from app.core.config import get_settings
@@ -46,7 +48,7 @@ async def chat(
     user: Annotated[User, Depends(current_user)],
     db: Annotated[DbSession, Depends(get_db)],
     memory_client: Annotated[MemoryClient, Depends(get_memory_client)],
-) -> StreamingResponse:
+) -> EventSourceResponse:
     now_utc = datetime.now(UTC).isoformat(timespec="seconds")
     log.info(
         "chat.start",
@@ -86,7 +88,7 @@ async def chat(
             user_id=str(user.id),
             client_message_id=str(body.client_message_id),
         )
-        return StreamingResponse(replay_stream(cached.content), media_type="text/event-stream")
+        return EventSourceResponse(replay_stream(cached))
 
     history = await asyncio.to_thread(
         load_recent_history,
@@ -105,4 +107,4 @@ async def chat(
         history=history,
         now_utc=now_utc,
     )
-    return StreamingResponse(stream_turn(turn), media_type="text/event-stream")
+    return EventSourceResponse(stream_turn(turn))

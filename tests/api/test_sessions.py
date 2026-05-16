@@ -1,4 +1,8 @@
-"""POST/GET/DELETE /sessions — happy path, isolation, pagination, soft delete."""
+"""POST/GET/DELETE /sessions and GET /sessions/{id}/messages.
+
+Covers happy paths, cross-user isolation, cursor pagination (both for the
+session list and the messages list), and soft-delete cascade.
+"""
 
 from __future__ import annotations
 
@@ -96,39 +100,19 @@ def test_list_sessions_pagination_cursor_round_trips(client: TestClient) -> None
     assert page1_ids.isdisjoint(page2_ids)
 
 
-def test_get_session_returns_messages_oldest_first(client: TestClient) -> None:
+def test_get_session_returns_metadata_only(client: TestClient) -> None:
     headers = auth_headers(client, PHRASE)
     owner = owner_id(client, headers)
     session_id = seed_session(user_id=owner, title="t")
-
-    base = datetime.now(UTC)
-    seed_message(
-        user_id=owner,
-        session_id=session_id,
-        role="user",
-        content="hello",
-        created_at=base - timedelta(seconds=10),
-    )
-    user_msg_id = seed_message(
-        user_id=owner,
-        session_id=session_id,
-        role="user",
-        content="follow-up",
-        created_at=base - timedelta(seconds=5),
-    )
-    seed_message(
-        user_id=owner,
-        session_id=session_id,
-        role="assistant",
-        content="reply",
-        parent_message_id=user_msg_id,
-        created_at=base,
-    )
+    seed_message(user_id=owner, session_id=session_id, role="user", content="ignored here")
 
     resp = client.get(f"/sessions/{session_id}", headers=headers)
     assert resp.status_code == 200
-    contents = [m["content"] for m in resp.json()["messages"]]
-    assert contents == ["hello", "follow-up", "reply"]
+    body = resp.json()
+    assert body["id"] == str(session_id)
+    assert body["title"] == "t"
+    assert "messages" not in body
+    assert "next_cursor" not in body
 
 
 def test_get_session_404_for_other_users_session(client: TestClient) -> None:
@@ -172,3 +156,115 @@ def test_delete_session_404_for_other_users_session(client: TestClient) -> None:
     foreign = seed_session(user_id=other, title="not yours")
     resp = client.delete(f"/sessions/{foreign}", headers=headers)
     assert resp.status_code == 404
+
+
+# ─── GET /sessions/{id}/messages — reverse-chronological pagination ────────
+
+
+def test_get_messages_returns_newest_first(client: TestClient) -> None:
+    headers = auth_headers(client, PHRASE)
+    owner = owner_id(client, headers)
+    session_id = seed_session(user_id=owner, title="t")
+
+    base = datetime.now(UTC)
+    seed_message(
+        user_id=owner,
+        session_id=session_id,
+        role="user",
+        content="oldest",
+        created_at=base - timedelta(seconds=10),
+    )
+    user_msg_id = seed_message(
+        user_id=owner,
+        session_id=session_id,
+        role="user",
+        content="middle",
+        created_at=base - timedelta(seconds=5),
+    )
+    seed_message(
+        user_id=owner,
+        session_id=session_id,
+        role="assistant",
+        content="newest",
+        parent_message_id=user_msg_id,
+        created_at=base,
+    )
+
+    resp = client.get(f"/sessions/{session_id}/messages", headers=headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    contents = [m["content"] for m in body["items"]]
+    assert contents == ["newest", "middle", "oldest"]
+    assert body["next_cursor"] is None
+
+
+def test_get_messages_pagination_cursor_round_trips(client: TestClient) -> None:
+    headers = auth_headers(client, PHRASE)
+    owner = owner_id(client, headers)
+    session_id = seed_session(user_id=owner, title="t")
+
+    base = datetime.now(UTC)
+    seeded = []
+    for i in range(5):
+        mid = seed_message(
+            user_id=owner,
+            session_id=session_id,
+            role="user",
+            content=f"m{i}",
+            created_at=base + timedelta(seconds=i),
+        )
+        seeded.append((i, mid))
+
+    page1 = client.get(f"/sessions/{session_id}/messages?limit=2", headers=headers).json()
+    assert [m["content"] for m in page1["items"]] == ["m4", "m3"]
+    assert page1["next_cursor"] is not None
+
+    page2 = client.get(
+        f"/sessions/{session_id}/messages?limit=2&before={page1['next_cursor']}",
+        headers=headers,
+    ).json()
+    assert [m["content"] for m in page2["items"]] == ["m2", "m1"]
+    assert page2["next_cursor"] is not None
+
+    page3 = client.get(
+        f"/sessions/{session_id}/messages?limit=2&before={page2['next_cursor']}",
+        headers=headers,
+    ).json()
+    assert [m["content"] for m in page3["items"]] == ["m0"]
+    assert page3["next_cursor"] is None
+
+    # No overlap between adjacent pages.
+    p1 = {m["id"] for m in page1["items"]}
+    p2 = {m["id"] for m in page2["items"]}
+    p3 = {m["id"] for m in page3["items"]}
+    assert p1.isdisjoint(p2)
+    assert p2.isdisjoint(p3)
+    assert p1.isdisjoint(p3)
+
+
+def test_get_messages_404_for_other_users_session(client: TestClient) -> None:
+    headers = auth_headers(client, PHRASE)
+    other = seed_extra_user("other-phrase-msg-aaa")
+    foreign = seed_session(user_id=other, title="not yours")
+    resp = client.get(f"/sessions/{foreign}/messages", headers=headers)
+    assert resp.status_code == 404
+
+
+def test_get_messages_404_when_session_soft_deleted(client: TestClient) -> None:
+    headers = auth_headers(client, PHRASE)
+    owner = owner_id(client, headers)
+    session_id = seed_session(user_id=owner, title="t")
+    client.delete(f"/sessions/{session_id}", headers=headers)
+    resp = client.get(f"/sessions/{session_id}/messages", headers=headers)
+    assert resp.status_code == 404
+
+
+def test_get_messages_422_on_malformed_cursor(client: TestClient) -> None:
+    headers = auth_headers(client, PHRASE)
+    owner = owner_id(client, headers)
+    session_id = seed_session(user_id=owner, title="t")
+    resp = client.get(
+        f"/sessions/{session_id}/messages?before=not-a-valid-cursor",
+        headers=headers,
+    )
+    assert resp.status_code == 422

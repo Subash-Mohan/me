@@ -3,6 +3,10 @@
 Thin shims over `app.services.sessions`. Every route is sync, parses input
 via Pydantic, calls one service function, translates the typed domain
 errors, and returns a Pydantic response.
+
+`GET /sessions/{id}` returns metadata only; messages live on the dedicated
+`GET /sessions/{id}/messages` route with reverse-chronological cursor
+pagination — the shape a chat UI needs for "initial render + scroll up".
 """
 
 from __future__ import annotations
@@ -18,8 +22,8 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.sessions import (
     MessageRead,
+    MessagesPageResponse,
     SessionCreate,
-    SessionDetailResponse,
     SessionListItem,
     SessionListResponse,
     SessionRead,
@@ -62,32 +66,41 @@ def list_items(
     return SessionListResponse(items=items, next_cursor=next_cursor)
 
 
-@router.get("/{session_id}", response_model=SessionDetailResponse)
+@router.get("/{session_id}", response_model=SessionRead)
 def detail(
     session_id: UUID,
     user: Annotated[User, Depends(current_user)],
     db: Annotated[DbSession, Depends(get_db)],
-    cursor: Annotated[str | None, Query()] = None,
+) -> SessionRead:
+    try:
+        session = get_session(db, user_id=user.id, session_id=session_id)
+    except SessionNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "session not found") from exc
+    return SessionRead.model_validate(session)
+
+
+@router.get("/{session_id}/messages", response_model=MessagesPageResponse)
+def messages(
+    session_id: UUID,
+    user: Annotated[User, Depends(current_user)],
+    db: Annotated[DbSession, Depends(get_db)],
+    before: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
-) -> SessionDetailResponse:
+) -> MessagesPageResponse:
     try:
         session = get_session(db, user_id=user.id, session_id=session_id)
     except SessionNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "session not found") from exc
 
     try:
-        messages, next_cursor = list_session_messages(
-            db, session=session, cursor=cursor, limit=limit
+        rows, next_cursor = list_session_messages(
+            db, session=session, cursor=before, limit=limit, direction="desc"
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
-    return SessionDetailResponse(
-        id=session.id,
-        title=session.title,
-        created_at=session.created_at,
-        last_message_at=session.last_message_at,
-        messages=[MessageRead.model_validate(m) for m in messages],
+    return MessagesPageResponse(
+        items=[MessageRead.model_validate(m) for m in rows],
         next_cursor=next_cursor,
     )
 

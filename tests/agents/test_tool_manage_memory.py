@@ -54,9 +54,11 @@ async def test_create_emits_call_and_end_ok(db, owner_id):
     assert isinstance(result, MemoryDetailResult)
     assert result.kind == "memory"
     assert [p.type for p in emitter.packets] == [
+        "manage_memory_start",
         "manage_memory_call",
         "manage_memory_end",
     ]
+    assert emitter.packets[0].tool_call_id == "tc_1"
     assert emitter.packets[-1].status == "ok"
 
 

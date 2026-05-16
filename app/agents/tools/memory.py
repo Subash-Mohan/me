@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.agents.context import AgentContext
-from app.agents.packets import ToolCallPacket, ToolEndPacket
+from app.agents.packets import ToolCallPacket, ToolEndPacket, ToolStartPacket
 from app.agents.tools._base import Tool
 from app.services import memory as memory_service
 
@@ -29,9 +29,9 @@ class SearchMemoriesResult(BaseModel):
     hits: list[SearchHit]
 
 
-class SearchMemoriesStartPacket(BaseModel):
+class SearchMemoriesStartPacket(ToolStartPacket):
     type: Literal["search_memories_start"] = "search_memories_start"
-    tool_call_id: str
+    tool_name: ClassVar[str] = "search_memories"
 
 
 class SearchMemoriesCallPacket(ToolCallPacket):
@@ -64,6 +64,7 @@ class SearchMemoriesTool(Tool[SearchMemoriesArgs, SearchMemoriesResult]):
         tool_call_id: str,
         args: SearchMemoriesArgs,
     ) -> SearchMemoriesResult:
+        self.emit_start(tool_call_id)
         self.emit_call(tool_call_id, args)
         try:
             search = await asyncio.to_thread(
@@ -187,9 +188,9 @@ class MemoryDetailResult(BaseModel):
     memory: dict  # MemoryDetail.model_dump(mode="json")
 
 
-class ManageMemoryStartPacket(BaseModel):
+class ManageMemoryStartPacket(ToolStartPacket):
     type: Literal["manage_memory_start"] = "manage_memory_start"
-    tool_call_id: str
+    tool_name: ClassVar[str] = "manage_memory"
 
 
 class ManageMemoryCallPacket(ToolCallPacket):
@@ -245,6 +246,7 @@ class ManageMemoryTool(Tool[ManageMemoryArgs, MemoryDetailResult]):
     ) -> MemoryDetailResult:
         from app.schemas.memory import MemoryDetail
 
+        self.emit_start(tool_call_id)
         self.emit_call(tool_call_id, args)
         try:
             if args.action == "create":

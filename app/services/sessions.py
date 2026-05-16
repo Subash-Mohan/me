@@ -176,27 +176,46 @@ def list_session_messages(
     session: Session,
     cursor: str | None = None,
     limit: int = 50,
+    direction: Literal["asc", "desc"] = "desc",
 ) -> tuple[list[Message], str | None]:
-    """Cursor-paginated messages within one session, oldest-first.
+    """Cursor-paginated messages within one session.
 
-    Caller is expected to have already proven ownership via `get_session`.
+    `direction="desc"` (default) returns newest-first — the shape a chat UI
+    wants for "initial render + scroll up to load older". `"asc"` returns
+    oldest-first for callers that want chronological order.
+
+    The cursor encodes `(created_at, id)` regardless of direction; the
+    comparison flips so the next page is strictly past the cursor in the
+    requested order. Caller is expected to have already proven ownership via
+    `get_session`.
     """
     limit = _clamp_limit(limit)
 
     stmt = (
         select(Message)
         .where(Message.session_id == session.id, Message.deleted_at.is_(None))
-        .order_by(Message.created_at.asc(), Message.id.asc())
         .limit(limit + 1)
     )
-    if cursor is not None:
-        cur_ts, cur_id = _decode_cursor(cursor)
-        stmt = stmt.where(
-            or_(
-                Message.created_at > cur_ts,
-                and_(Message.created_at == cur_ts, Message.id > cur_id),
+    if direction == "asc":
+        stmt = stmt.order_by(Message.created_at.asc(), Message.id.asc())
+        if cursor is not None:
+            cur_ts, cur_id = _decode_cursor(cursor)
+            stmt = stmt.where(
+                or_(
+                    Message.created_at > cur_ts,
+                    and_(Message.created_at == cur_ts, Message.id > cur_id),
+                )
             )
-        )
+    else:
+        stmt = stmt.order_by(Message.created_at.desc(), Message.id.desc())
+        if cursor is not None:
+            cur_ts, cur_id = _decode_cursor(cursor)
+            stmt = stmt.where(
+                or_(
+                    Message.created_at < cur_ts,
+                    and_(Message.created_at == cur_ts, Message.id < cur_id),
+                )
+            )
 
     rows = list(db.execute(stmt).scalars().all())
     if len(rows) > limit:
@@ -288,22 +307,34 @@ def record_assistant_message(
     session: Session,
     parent_message_id: UUID,
     content: str,
-    tool_activity: dict[str, Any] | None,
+    events: list[dict[str, Any]] | None,
+    id: UUID | None = None,
 ) -> Message:
     """Insert the assistant-message row.
 
     The partial UNIQUE on `parent_message_id` guards against double-write if
     the endpoint somehow flushes twice for the same turn. Caller is expected
     to have already streamed the deltas.
+
+    `events` is the step-ordered timeline of the turn (`TextEvent` and
+    `ToolEvent` dumps interleaved). `content` is the joined text body
+    derived from `events`, kept as a separate column for FTS / preview.
+
+    `id` is optional: when supplied, it's used directly so the value the
+    streamed `start`/`finish` packets advertised matches the persisted row.
+    When omitted, the DB default (`gen_random_uuid()`) fills it in.
     """
-    message = Message(
-        session_id=session.id,
-        user_id=user_id,
-        role="assistant",
-        content=content,
-        tool_activity=tool_activity,
-        parent_message_id=parent_message_id,
-    )
+    fields: dict[str, Any] = {
+        "session_id": session.id,
+        "user_id": user_id,
+        "role": "assistant",
+        "content": content,
+        "events": events,
+        "parent_message_id": parent_message_id,
+    }
+    if id is not None:
+        fields["id"] = id
+    message = Message(**fields)
     db.add(message)
     session.last_message_at = datetime.now(UTC)
     db.flush()

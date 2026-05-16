@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 from app.agents.context import AgentContext
 from app.agents.emitter import Emitter
 from app.agents.instructions import render_system_prompt
-from app.agents.packets import ErrorPacket, RunDonePacket
-from app.agents.sse import _dispatch_tool_start, translate_framework
+from app.agents.packets import ErrorPacket
+from app.agents.sse import translate_framework
 from app.agents.tools import ALL_TOOL_CLASSES, Packet
 from app.agents.tools._base import Tool
 from app.core.config import get_settings
@@ -50,7 +50,7 @@ def build_agent(
     *,
     now_utc: str,
     client_tz: str,
-) -> tuple[Agent[AgentContext], dict[str, Tool]]:
+) -> Agent[AgentContext]:
     settings = get_settings()
     client = AsyncOpenAI(
         api_key=settings.openrouter_api_key.get_secret_value(),
@@ -60,14 +60,13 @@ def build_agent(
         model=settings.openrouter_default_model,
         openai_client=client,
     )
-    tools = {cls.NAME: cls(emitter=emitter) for cls in ALL_TOOL_CLASSES}
-    agent: Agent[AgentContext] = Agent(
+    tools = [cls(emitter=emitter) for cls in ALL_TOOL_CLASSES]
+    return Agent(
         name="me-chat",
         instructions=render_system_prompt(now_utc=now_utc, client_tz=client_tz),
         model=model,
-        tools=[_adapt(t) for t in tools.values()],
+        tools=[_adapt(t) for t in tools],
     )
-    return agent, tools
 
 
 def _build_input(
@@ -105,7 +104,7 @@ async def run_agent_stream(
 ) -> AsyncIterator[Packet]:
     queue: asyncio.Queue = asyncio.Queue()
     emitter = Emitter(queue, asyncio.get_running_loop())
-    agent, tools = build_agent(emitter, now_utc=now_utc, client_tz=client_tz)
+    agent = build_agent(emitter, now_utc=now_utc, client_tz=client_tz)
     ctx = AgentContext(db=db, memory_client=memory_client, user=user, emitter=emitter)
     agent_input = _build_input(user_input, history)
 
@@ -115,8 +114,6 @@ async def run_agent_stream(
             async for sdk_event in result.stream_events():
                 for packet in translate_framework(sdk_event):
                     emitter.emit(packet)
-                _dispatch_tool_start(sdk_event, tools, emitter)
-            emitter.emit(RunDonePacket(reason="stop"))
         except Exception as exc:
             log.exception("agent_stream_failed: %s", type(exc).__name__)
             emitter.emit(ErrorPacket(code="agent_failed", message=type(exc).__name__))

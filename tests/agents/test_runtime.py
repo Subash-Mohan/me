@@ -1,7 +1,9 @@
 """Runtime smoke test: drives run_agent_stream with a fake SDK Runner.
 
 The real OpenRouter / OpenAI Agents SDK call path is exercised manually; this
-test verifies the framework wiring (event translation, run_done, sentinel).
+test verifies the framework wiring (event translation, clean stream
+termination, sentinel). Stream framing (`start` / `finish`) belongs to the
+chat layer and is asserted in `tests/api/test_chat.py`.
 """
 
 from types import SimpleNamespace
@@ -43,7 +45,7 @@ async def test_run_agent_stream_emits_packets_for_simple_text_turn(db, monkeypat
     monkeypatch.setattr(
         runtime,
         "build_agent",
-        lambda emitter, *, now_utc, client_tz: (object(), {}),
+        lambda emitter, *, now_utc, client_tz: object(),
     )
 
     from app.agents.runtime import run_agent_stream
@@ -60,6 +62,5 @@ async def test_run_agent_stream_emits_packets_for_simple_text_turn(db, monkeypat
         packets.append(pkt)
 
     types = [p.type for p in packets]
-    assert "text_delta" in types
-    assert types[-1] == "run_done"
+    assert types == ["text_delta"]
     assert any(isinstance(p, TextDeltaPacket) and p.delta == "Hello" for p in packets)

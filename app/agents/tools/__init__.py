@@ -2,7 +2,7 @@ from typing import Annotated, Union
 
 from pydantic import Field
 
-from app.agents.packets import ErrorPacket, RunDonePacket, TextDeltaPacket
+from app.agents.packets import ErrorPacket, FinishPacket, StartPacket, TextDeltaPacket
 from app.agents.tools._base import Tool
 from app.agents.tools.memory import ManageMemoryTool, SearchMemoriesTool
 
@@ -16,7 +16,7 @@ _tool_packet_classes = tuple(
 # Dynamic unpack of registered tool packet classes; Pydantic resolves at runtime
 # via TypeAdapter. Adding a new tool only requires appending to ALL_TOOL_CLASSES.
 Packet = Annotated[
-    Union[TextDeltaPacket, RunDonePacket, ErrorPacket, *_tool_packet_classes],  # ty: ignore[invalid-type-form]
+    Union[StartPacket, TextDeltaPacket, FinishPacket, ErrorPacket, *_tool_packet_classes],  # ty: ignore[invalid-type-form]
     Field(discriminator="type"),
 ]
 

@@ -59,9 +59,11 @@ async def test_search_emits_call_and_end_ok(db, owner_id):
     assert isinstance(result, SearchMemoriesResult)
     assert result.source == "local"
     assert [p.type for p in emitter.packets] == [
+        "search_memories_start",
         "search_memories_call",
         "search_memories_end",
     ]
+    assert emitter.packets[0].tool_call_id == "tc_1"
     assert emitter.packets[-1].status == "ok"
     assert len(emitter.packets[-1].result.hits) >= 1
 

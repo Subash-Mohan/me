@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "pyjwt>=2.8",
     "sqlalchemy>=2.0",
+    "sse-starlette>=2.1",
     "structlog>=24.0",
     "supermemory>=3.39.0",
     "uvicorn[standard]>=0.30",
