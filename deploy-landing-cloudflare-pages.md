@@ -16,7 +16,7 @@ Everything else in `landing_page/` (`brand-spec.md`, `DESIGN-HANDOFF.md`, `DESIG
 ## Prerequisites
 
 - A Cloudflare account (free tier is enough — Pages includes unlimited bandwidth and free TLS).
-- The repo pushed to GitHub at `https://github.com/SubashMohan/me`.
+- The repo pushed to GitHub at `https://github.com/Subash-Mohan/me`.
 - (Optional) A custom domain managed by Cloudflare DNS, if you want to point e.g. `me.example.com` at the deploy.
 
 ---
@@ -28,7 +28,7 @@ Cloudflare clones the repo on every push to `main` and redeploys automatically. 
 ### 1. Create the Pages project
 
 1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
-2. Authorize Cloudflare for GitHub, then pick `SubashMohan/me`.
+2. Authorize Cloudflare for GitHub, then pick `Subash-Mohan/me`.
 3. On the build configuration screen, set:
 
    | Field | Value |
@@ -88,7 +88,7 @@ After the first deploy:
 - [ ] `curl -sI https://<deploy-url>/` shows all seven security headers plus the `Cache-Control` override.
 - [ ] Browser DevTools → Console on the deploy URL → **0** CSP violation entries.
 - [ ] Embedding the URL in `<iframe src="...">` from a different origin is blocked (`Refused to display ... because an ancestor violates ... frame-ancestors 'none'`).
-- [ ] The five GitHub CTAs in the page all resolve to `https://github.com/SubashMohan/me` and return 200.
+- [ ] The five GitHub CTAs in the page all resolve to `https://github.com/Subash-Mohan/me` and return 200.
 - [ ] None of these paths are reachable: `/brand-spec.md`, `/DESIGN-HANDOFF.md`, `/DESIGN-MANIFEST.json`, `/mp8nfqs1-*.png`. They should 404.
 
 ---
