@@ -1,0 +1,1664 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>me. — the journal that talks back · open source</title>
+<meta name="description" content="me. is an open-source, chat-first journal that remembers everything for you. Clone the repo, run it on your own machine, and keep a private memory layer for your life.">
+<style>
+  :root {
+    --bg:           #08080a;
+    --bg-deep:      #050506;
+    --surface:      #101011;
+    --surface-2:    #141416;
+    --surface-3:    #1a1a1c;
+    --linen:        #ece9e1;
+    --linen-strong: #f4f1e9;
+    --ink:          #141413;
+
+    --fg:           #d6d2c8;
+    --fg-strong:    #ece9e1;
+    --muted:        #7a766e;
+    --muted-soft:   #5b5853;
+
+    --border:       rgba(255, 255, 255, 0.06);
+    --border-2:     rgba(255, 255, 255, 0.10);
+    --border-3:     rgba(255, 255, 255, 0.16);
+
+    --mint:         #7bc89e;
+    --mint-deep:    #2f6f51;
+    --mint-wash:    rgba(123, 200, 158, 0.16);
+
+    --font-display: "Iowan Old Style", "Charter", "EB Garamond", Georgia, serif;
+    --font-body:    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
+    --font-mono:    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+    --r-pill:  999px;
+    --r-xl:    32px;
+    --r-lg:    28px;
+    --r-md:    20px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { background: var(--bg-deep); color-scheme: dark; }
+  body {
+    background:
+      radial-gradient(ellipse 90% 50% at 50% 0%, rgba(255, 255, 255, 0.05), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 14% 8%, rgba(123, 200, 158, 0.05), transparent 60%),
+      var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; text-decoration: none; }
+  button, input { font: inherit; color: inherit; }
+  img, svg { display: block; max-width: 100%; }
+  h1, h2, h3, p { margin: 0; }
+  ::selection { background: var(--linen); color: var(--ink); }
+
+  .container {
+    width: min(1200px, calc(100% - 40px));
+    margin: 0 auto;
+  }
+  @media (min-width: 820px) {
+    .container { width: min(1200px, calc(100% - 80px)); }
+  }
+
+  /* ---------------- top bar — mirrors the app chrome ---------------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: rgba(8, 8, 10, 0.78);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    min-height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--fg-strong);
+  }
+  .brand-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border-2);
+    background: var(--surface);
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-style: italic;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .listening {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  .listening .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 0 0 var(--mint-wash);
+    animation: pulse 2.4s ease-out infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 var(--mint-wash); }
+    70%  { box-shadow: 0 0 0 9px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+  .nav-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px 10px 14px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-2);
+    background: var(--surface);
+    color: var(--fg-strong);
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    transition: border-color 160ms ease, background 160ms ease;
+  }
+  .pill-btn:hover { border-color: var(--border-3); background: var(--surface-2); }
+  .pill-btn svg { width: 16px; height: 16px; }
+  .nav-link {
+    padding: 10px 14px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    transition: color 160ms ease;
+  }
+  .nav-link:hover { color: var(--fg-strong); }
+
+  /* ---------------- hero ---------------- */
+  .hero {
+    padding: 88px 0 120px;
+    position: relative;
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    align-items: center;
+    gap: 64px;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.24em;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 0 6px var(--mint-wash);
+  }
+  .hero-title {
+    max-width: 11ch;
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(3.25rem, 8vw, 6.6rem);
+    font-weight: 500;
+    line-height: 0.96;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+  }
+  .hero-title em {
+    color: var(--linen);
+    font-style: italic;
+  }
+  .lede {
+    max-width: 38ch;
+    margin-top: 26px;
+    color: var(--fg);
+    font-family: var(--font-display);
+    font-size: clamp(1.18rem, 1.65vw, 1.55rem);
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+  .hero-meta {
+    margin-top: 28px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .meta-chip {
+    padding: 8px 14px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .store-row {
+    margin-top: 36px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .store-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 188px;
+    padding: 12px 18px 12px 14px;
+    border-radius: 16px;
+    background: var(--surface);
+    color: var(--fg-strong);
+    border: 1px solid var(--border-2);
+    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+  }
+  .store-btn:hover {
+    transform: translateY(-1px);
+    border-color: var(--border-3);
+    background: var(--surface-2);
+  }
+  .store-btn.is-primary {
+    background: var(--linen);
+    color: var(--ink);
+    border-color: transparent;
+  }
+  .store-btn.is-primary:hover { background: var(--linen-strong); }
+  .store-btn svg { width: 22px; height: 22px; flex: 0 0 22px; }
+  .store-text { display: flex; flex-direction: column; line-height: 1.05; text-align: left; }
+  .store-text small {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, currentColor 52%, transparent);
+    margin-bottom: 3px;
+  }
+  .store-text strong { font-size: 15px; font-weight: 600; }
+  .hero-note {
+    margin-top: 22px;
+    color: var(--muted-soft);
+    font-size: 13px;
+  }
+
+  /* ---------------- the app-faithful chat preview ---------------- */
+  .device {
+    position: relative;
+    padding: 24px 22px 22px;
+    border-radius: 40px;
+    border: 1px solid var(--border-2);
+    background:
+      radial-gradient(ellipse 100% 50% at 50% 0%, rgba(255, 255, 255, 0.04), transparent 70%),
+      var(--surface);
+    box-shadow:
+      0 40px 90px -50px rgba(0, 0, 0, 0.9),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    overflow: hidden;
+  }
+  .device-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+  }
+  .device-bar .brand-mark { width: 40px; height: 40px; font-size: 20px; }
+  .device-bar .listening { font-size: 11px; letter-spacing: 0.24em; }
+  .device-bar .pill-btn {
+    padding: 7px 12px 7px 10px;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+  }
+  .device-bar .pill-btn svg { width: 14px; height: 14px; }
+
+  .thread {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 6px 4px 14px;
+  }
+  .bubble-row {
+    display: flex;
+    flex-direction: column;
+  }
+  .bubble-row.user { align-items: flex-end; }
+  .bubble-row.me   { align-items: flex-start; }
+  .bubble-time {
+    margin-top: 8px;
+    color: var(--muted-soft);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .bubble-row.me .bubble-time {
+    order: -1;
+    margin: 0 0 8px 4px;
+  }
+  .bubble {
+    max-width: 86%;
+    padding: 16px 20px;
+    border-radius: 28px;
+    line-height: 1.4;
+    font-size: 16.5px;
+    border: 1px solid transparent;
+  }
+  .bubble.user {
+    background: var(--linen);
+    color: var(--ink);
+    border-bottom-right-radius: 12px;
+    font-weight: 500;
+  }
+  .bubble.me {
+    background: rgba(255, 255, 255, 0.014);
+    border-color: var(--border-2);
+    color: var(--fg);
+    border-bottom-left-radius: 12px;
+    max-width: 92%;
+  }
+  .logged-card {
+    margin-top: 4px;
+    padding: 18px 20px;
+    border-radius: 22px;
+    border: 1px solid var(--border-2);
+    background: rgba(255, 255, 255, 0.014);
+    align-self: flex-start;
+    max-width: 84%;
+  }
+  .logged-meta {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  .logged-meta .sep { color: var(--muted-soft); }
+  .logged-meta .icon { color: var(--mint); display: inline-flex; align-items: center; }
+  .logged-meta .icon svg { width: 14px; height: 14px; }
+  .logged-title {
+    margin-top: 10px;
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.2;
+  }
+  .logged-tag {
+    margin-top: 14px;
+    display: inline-flex;
+    padding: 6px 12px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-2);
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  .composer {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px 10px 10px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-2);
+    background: var(--surface-2);
+  }
+  .composer-actions { display: inline-flex; gap: 8px; }
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: 1px solid var(--border-2);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .icon-btn.round { border-radius: 50%; }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .composer-text {
+    flex: 1;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .icon-btn.mic { border: 0; color: var(--muted); }
+
+  /* ---------------- phone frame (real product mock) ---------------- */
+  .phone {
+    position: relative;
+    width: 100%;
+    max-width: 360px;
+    aspect-ratio: 9 / 19.5;
+    margin: 0 auto;
+    background: linear-gradient(180deg, #1d1d20 0%, #0a0a0c 60%, #08080a 100%);
+    border-radius: 56px;
+    padding: 11px;
+    box-shadow:
+      inset 0 0 0 1.5px rgba(255, 255, 255, 0.10),
+      inset 0 0 0 5px #07070a,
+      inset 0 0 0 6px rgba(255, 255, 255, 0.04),
+      0 70px 130px -40px rgba(0, 0, 0, 0.95),
+      0 30px 60px -30px rgba(0, 0, 0, 0.75);
+    isolation: isolate;
+  }
+  .phone::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.10), transparent 22%),
+      linear-gradient(0deg,   rgba(255, 255, 255, 0.04), transparent 22%);
+    pointer-events: none;
+    z-index: 3;
+  }
+  .phone-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 46px;
+    overflow: hidden;
+    background: #000;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    z-index: 1;
+  }
+  .phone-screen img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+  }
+
+  /* ---------------- in-phone product UI ---------------- */
+  .scr {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--fg-strong);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.45;
+    overflow: hidden;
+  }
+  .scr::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 90% 35% at 50% 0%, rgba(255, 255, 255, 0.05), transparent 70%),
+      radial-gradient(ellipse 60% 30% at 18% 6%, rgba(123, 200, 158, 0.06), transparent 70%);
+    pointer-events: none;
+  }
+  .scr-bar {
+    position: relative;
+    z-index: 2;
+    padding: 18px 18px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .scr-mark {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--border-2);
+    background: var(--surface);
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--fg-strong);
+  }
+  .scr-listening {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--muted);
+    font-size: 9px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  .scr-listening .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 0 0 var(--mint-wash);
+    animation: pulse 2.4s ease-out infinite;
+  }
+  .scr-brand-row { display: inline-flex; align-items: center; gap: 10px; }
+  .scr-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 12px 7px 10px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-2);
+    background: var(--surface);
+    color: var(--fg-strong);
+    font-size: 9.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .scr-pill svg { width: 12px; height: 12px; }
+
+  /* chat thread */
+  .scr-thread {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    overflow: hidden;
+    padding: 4px 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .scr-time {
+    color: var(--muted-soft);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    align-self: flex-end;
+  }
+  .scr-time.left { align-self: flex-start; }
+  .scr-b {
+    max-width: 84%;
+    padding: 11px 15px;
+    border-radius: 20px;
+    font-size: 13.5px;
+    line-height: 1.4;
+    border: 1px solid transparent;
+  }
+  .scr-b.user {
+    align-self: flex-end;
+    background: var(--linen);
+    color: var(--ink);
+    border-bottom-right-radius: 8px;
+    font-weight: 500;
+  }
+  .scr-b.me {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.015);
+    color: var(--fg);
+    border-color: var(--border-2);
+    border-bottom-left-radius: 8px;
+  }
+  .scr-log {
+    align-self: flex-start;
+    max-width: 92%;
+    padding: 12px 14px 14px;
+    border-radius: 18px;
+    border: 1px solid var(--border-2);
+    background: rgba(255, 255, 255, 0.012);
+  }
+  .scr-log-meta {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .scr-log-meta .sp { color: var(--muted-soft); }
+  .scr-log-meta .ic { color: var(--mint); display: inline-flex; align-items: center; }
+  .scr-log-meta .ic svg { width: 10px; height: 10px; }
+  .scr-log-title {
+    margin-top: 8px;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 15px;
+    line-height: 1.25;
+    color: var(--fg-strong);
+  }
+  .scr-log-tag {
+    margin-top: 10px;
+    display: inline-flex;
+    padding: 4px 8px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-2);
+    color: var(--muted);
+    font-size: 8.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  /* chat composer */
+  .scr-composer {
+    position: relative;
+    z-index: 2;
+    margin: 0 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px 7px 7px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-2);
+    background: var(--surface-2);
+  }
+  .scr-iconbtn {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: 1px solid var(--border-2);
+    color: var(--fg);
+  }
+  .scr-iconbtn svg { width: 13px; height: 13px; }
+  .scr-iconbtn.round { border-radius: 50%; }
+  .scr-iconbtn.bare { border: 0; color: var(--muted); }
+  .scr-composer-text { flex: 1; color: var(--muted); font-size: 12.5px; }
+
+  /* log screen */
+  .scr-log-head {
+    position: relative;
+    z-index: 2;
+    padding: 18px 18px 8px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+  }
+  .scr-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 12px 7px 10px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-2);
+    background: var(--surface);
+    color: var(--fg-strong);
+    font-size: 9.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .scr-back svg { width: 11px; height: 11px; }
+  .scr-wordmark {
+    text-align: center;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 23px;
+    color: var(--fg-strong);
+    letter-spacing: -0.02em;
+  }
+  .scr-spacer { width: 64px; }
+  .scr-search {
+    margin: 6px 16px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-2);
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 12px;
+    position: relative;
+    z-index: 2;
+  }
+  .scr-search svg { width: 13px; height: 13px; flex: 0 0 13px; }
+  .scr-list {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    overflow: hidden;
+    padding: 0 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .scr-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .scr-card {
+    padding: 13px 14px 14px;
+    border-radius: 18px;
+    border: 1px solid var(--border-2);
+    background: rgba(255, 255, 255, 0.012);
+    min-height: 78px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .scr-card .stamp {
+    color: var(--muted);
+    font-size: 9.5px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  .scr-card .place {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  .scr-card .place svg { width: 11px; height: 11px; }
+  .scr-card .t-sans {
+    margin-top: 8px;
+    color: var(--fg-strong);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .scr-card .t-serif {
+    margin-top: 10px;
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 14px;
+    line-height: 1.3;
+  }
+  .scr-end {
+    margin-top: 10px;
+    text-align: center;
+    color: var(--muted-soft);
+    font-size: 9px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+  }
+  .scr-fade {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 80px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--bg) 90%);
+    z-index: 3;
+  }
+  @media (max-width: 920px) {
+    .scr-b { font-size: 12.5px; padding: 10px 13px; }
+    .scr-log-title, .scr-card .t-sans, .scr-card .t-serif { font-size: 13px; }
+    .scr-wordmark { font-size: 21px; }
+  }
+  @media (max-width: 700px) {
+    .scr-bar, .scr-log-head { padding-left: 14px; padding-right: 14px; padding-top: 14px; }
+    .scr-thread { padding: 4px 12px 10px; gap: 11px; }
+    .scr-list { padding: 0 12px 14px; }
+    .scr-composer { margin: 0 10px 12px; }
+    .scr-search { margin: 4px 12px 10px; }
+  }
+  .phone-glow {
+    position: absolute;
+    inset: -80px;
+    border-radius: 120px;
+    background:
+      radial-gradient(ellipse 55% 45% at 50% 28%, rgba(123, 200, 158, 0.10), transparent 70%),
+      radial-gradient(ellipse 70% 40% at 50% 78%, rgba(236, 233, 225, 0.05), transparent 70%);
+    z-index: -1;
+    pointer-events: none;
+    filter: blur(8px);
+  }
+  .hero .phone        { max-width: 380px; }
+  .log-split .phone   { max-width: 380px; }
+
+  .section-title em { font-style: italic; color: var(--linen); }
+
+  /* ---------------- log split (memory section, paired with phone) ---------------- */
+  .log-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 88px;
+  }
+  .log-copy { max-width: 48ch; }
+  .log-bullets {
+    margin: 36px 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 12px;
+  }
+  .log-bullets li {
+    position: relative;
+    padding: 18px 22px 18px 52px;
+    border-radius: 22px;
+    border: 1px solid var(--border-2);
+    background: var(--surface);
+  }
+  .log-bullets li::before {
+    content: "";
+    position: absolute;
+    left: 22px;
+    top: 24px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 0 5px var(--mint-wash);
+  }
+  .log-bullets li strong {
+    display: block;
+    color: var(--fg-strong);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.3;
+    margin-bottom: 4px;
+  }
+  .log-bullets li span {
+    display: block;
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.55;
+  }
+
+  /* ---------------- section: what it does ---------------- */
+  .section-quiet {
+    padding: 120px 0;
+    position: relative;
+    border-top: 1px solid var(--border);
+  }
+  .section-head {
+    max-width: 760px;
+  }
+  .section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 22px;
+    color: var(--mint);
+    font-size: 11px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+  }
+  .section-label::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 0 6px var(--mint-wash);
+  }
+  .section-title {
+    max-width: 14ch;
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 6vw, 4.4rem);
+    font-weight: 500;
+    line-height: 1.02;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+  }
+  .section-copy {
+    margin-top: 20px;
+    max-width: 46ch;
+    color: var(--fg);
+    font-family: var(--font-display);
+    font-size: clamp(1.05rem, 1.5vw, 1.28rem);
+    line-height: 1.55;
+  }
+  .feature-grid {
+    margin-top: 64px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .feature-card {
+    min-width: 0;
+    padding: 24px;
+    border-radius: var(--r-xl);
+    background: var(--surface);
+    border: 1px solid var(--border-2);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .feature-card h3 {
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(1.7rem, 2.4vw, 2.05rem);
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-top: 6px;
+  }
+  .feature-card .step {
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  .feature-card p {
+    color: var(--muted);
+    font-size: 15.5px;
+    line-height: 1.65;
+  }
+  .mini {
+    margin-top: auto;
+    padding: 16px 18px;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+  .mini-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .mini-row + .mini-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .mini-row .who {
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    flex: 0 0 56px;
+    padding-top: 2px;
+  }
+  .mini-row .what {
+    color: var(--fg);
+    font-size: 14.5px;
+    line-height: 1.5;
+    flex: 1;
+  }
+  .mini-row .what em {
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--fg-strong);
+  }
+  .mini .tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+  .mini .tag {
+    padding: 5px 10px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .mini .tag.mint { color: var(--mint); border-color: rgba(123, 200, 158, 0.32); }
+
+  /* ---------------- log section — mirrors the second screen ---------------- */
+  .log-section {
+    padding: 96px 0 120px;
+    border-top: 1px solid var(--border);
+  }
+  .log-frame {
+    padding: 36px 28px 40px;
+    border-radius: 36px;
+    border: 1px solid var(--border-2);
+    background:
+      radial-gradient(ellipse 90% 40% at 50% 0%, rgba(255, 255, 255, 0.035), transparent 70%),
+      var(--surface);
+  }
+  .log-head {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .log-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px 10px 14px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-2);
+    background: var(--surface-2);
+    color: var(--fg-strong);
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  .log-back svg { width: 14px; height: 14px; }
+  .log-word {
+    text-align: center;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: clamp(1.8rem, 3.4vw, 2.6rem);
+    color: var(--fg-strong);
+    letter-spacing: -0.02em;
+  }
+  .log-spacer { width: 96px; }
+  .log-search {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-2);
+    background: var(--surface-2);
+    color: var(--muted);
+    margin-bottom: 18px;
+  }
+  .log-search svg { width: 18px; height: 18px; flex: 0 0 18px; }
+  .log-search-text { font-size: 14.5px; }
+  .log-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .log-grid .row-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .log-card {
+    padding: 22px 22px 24px;
+    border-radius: 24px;
+    border: 1px solid var(--border-2);
+    background: rgba(255, 255, 255, 0.014);
+    min-height: 130px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .log-card .stamp {
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+  }
+  .log-card .place {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+  .log-card .place svg { width: 14px; height: 14px; }
+  .log-card .title-sans {
+    margin-top: 14px;
+    color: var(--fg-strong);
+    font-size: 19px;
+    font-weight: 500;
+    line-height: 1.35;
+  }
+  .log-card .title-serif {
+    margin-top: 14px;
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 19px;
+    line-height: 1.35;
+  }
+  .log-end {
+    margin-top: 28px;
+    text-align: center;
+    color: var(--muted-soft);
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+  }
+
+  /* ---------------- privacy band ---------------- */
+  .privacy {
+    padding: 120px 0;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 0%, rgba(123, 200, 158, 0.06), transparent 60%),
+      var(--bg);
+    border-top: 1px solid var(--border);
+  }
+  .privacy-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+    gap: 48px;
+    align-items: start;
+  }
+  .privacy h2 {
+    max-width: 16ch;
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(2.3rem, 5.4vw, 4.2rem);
+    font-weight: 500;
+    line-height: 1.02;
+    letter-spacing: -0.045em;
+  }
+  .privacy h2 em { font-style: italic; color: var(--linen); }
+  .privacy .lead {
+    margin-top: 24px;
+    max-width: 44ch;
+    color: var(--fg);
+    font-family: var(--font-display);
+    font-size: clamp(1.05rem, 1.4vw, 1.22rem);
+    line-height: 1.55;
+  }
+  .privacy-list {
+    display: grid;
+    gap: 12px;
+  }
+  .privacy-item {
+    padding: 22px 22px;
+    border-radius: 22px;
+    border: 1px solid var(--border-2);
+    background: var(--surface);
+  }
+  .privacy-item .kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--mint);
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .privacy-item .kicker::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--mint);
+  }
+  .privacy-item strong {
+    display: block;
+    color: var(--fg-strong);
+    font-size: 17px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .privacy-item span {
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.6;
+  }
+
+  /* ---------------- closing / quickstart ---------------- */
+  .closing {
+    padding: 0 0 96px;
+  }
+  .closing-card {
+    padding: 56px 48px;
+    border-radius: 36px;
+    border: 1px solid var(--border-2);
+    background:
+      radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255, 255, 255, 0.04), transparent 70%),
+      var(--surface);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    align-items: center;
+    gap: 48px;
+  }
+  .closing-card h2 {
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4.8vw, 3.6rem);
+    font-weight: 500;
+    line-height: 1.04;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+  }
+  .closing-card h2 em { font-style: italic; color: var(--linen); }
+  .closing-card p {
+    margin-top: 16px;
+    max-width: 38ch;
+    color: var(--fg);
+    font-size: 16px;
+  }
+  .quickstart {
+    padding: 22px 24px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--border-2);
+    background:
+      radial-gradient(ellipse 80% 60% at 0% 0%, rgba(123, 200, 158, 0.05), transparent 60%),
+      var(--bg-deep);
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    line-height: 1.85;
+    color: var(--fg);
+    overflow-x: auto;
+  }
+  .quickstart .line { display: block; white-space: nowrap; }
+  .quickstart .prompt { color: var(--mint); margin-right: 12px; user-select: none; }
+  .quickstart .comment { color: var(--muted-soft); }
+  .quickstart .tok { color: var(--linen); }
+  .quickstart-foot {
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  /* ---------------- footer ---------------- */
+  .footer {
+    padding: 28px 0 56px;
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+  .footer-inner {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .footer-links { display: flex; gap: 22px; flex-wrap: wrap; }
+  .footer-links a:hover { color: var(--fg-strong); }
+  .footer .wm {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: var(--fg-strong);
+    letter-spacing: -0.01em;
+  }
+
+  /* ---------------- responsive ---------------- */
+  @media (max-width: 1180px) {
+    .hero-grid,
+    .privacy-grid,
+    .log-split {
+      grid-template-columns: 1fr;
+      gap: 56px;
+    }
+    .hero-title { max-width: 14ch; }
+    .closing-card { grid-template-columns: 1fr; }
+    .log-copy { max-width: none; }
+  }
+  @media (max-width: 920px) {
+    .feature-grid { grid-template-columns: 1fr; }
+    .section-quiet, .privacy { padding: 96px 0; }
+    .log-section { padding: 80px 0 96px; }
+    .closing-card { padding: 40px 32px; }
+    .phone, .hero .phone, .log-split .phone { max-width: 320px; border-radius: 48px; padding: 9px; }
+    .phone-screen { border-radius: 40px; }
+  }
+  @media (max-width: 700px) {
+    .topbar-inner { min-height: 64px; }
+    .topbar .listening { display: none; }
+    .nav-right .nav-link { display: none; }
+    .hero { padding: 56px 0 88px; }
+    .closing-card { padding: 32px 22px; }
+    .phone, .hero .phone, .log-split .phone { max-width: 280px; border-radius: 42px; padding: 8px; }
+    .phone-screen { border-radius: 36px; }
+    .log-bullets li { padding: 16px 18px 16px 46px; }
+    .log-bullets li::before { left: 18px; top: 22px; }
+  }
+  @media (max-width: 520px) {
+    .container { width: min(100% - 24px, 100%); }
+    .store-btn { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" href="#top" aria-label="me. home">
+      <span class="brand-mark">M.</span>
+      <span class="listening" aria-label="Listening"><span class="dot" aria-hidden="true"></span>Listening</span>
+    </a>
+    <div class="nav-right">
+      <a class="nav-link" href="#how">How it works</a>
+      <a class="nav-link" href="#privacy">Privacy</a>
+      <a class="nav-link" href="#quickstart">Quickstart</a>
+      <a class="pill-btn" href="https://github.com/your-username/me" target="_blank" rel="noopener" aria-label="View source on GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.78-.25.78-.56v-2.16c-3.2.7-3.87-1.54-3.87-1.54-.52-1.34-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.25 3.34.96.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11 11 0 0 1 2.9-.39c.98 0 1.97.13 2.9.39 2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.66.79.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/>
+        </svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="container hero-grid">
+      <div>
+        <div class="eyebrow">Private chat-first journal</div>
+        <h1 class="hero-title">The journal that <em>talks back.</em></h1>
+        <p class="lede">Send a thought as fast as a text. Add a photo, set a reminder, then ask weeks later — "what did I say about the Taj Mahal, that hard week, the place with the winter broth?" me. remembers in your own words.</p>
+        <div class="hero-meta" aria-label="Product summary">
+          <span class="meta-chip">One screen to talk</span>
+          <span class="meta-chip">One to browse memory</span>
+          <span class="meta-chip">Self-hosted, end-to-end yours</span>
+        </div>
+        <div class="store-row" id="code">
+          <a class="store-btn is-primary" href="https://github.com/your-username/me" target="_blank" rel="noopener" aria-label="View source on GitHub">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.78-.25.78-.56v-2.16c-3.2.7-3.87-1.54-3.87-1.54-.52-1.34-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.25 3.34.96.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11 11 0 0 1 2.9-.39c.98 0 1.97.13 2.9.39 2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.66.79.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/>
+            </svg>
+            <span class="store-text"><small>View source on</small><strong>GitHub</strong></span>
+          </a>
+          <a class="store-btn" href="#quickstart" aria-label="Clone and run locally">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path d="M4 7l4 5-4 5"/>
+              <path d="M11 19h9"/>
+            </svg>
+            <span class="store-text"><small>Clone &amp; run</small><strong>Locally</strong></span>
+          </a>
+        </div>
+        <p class="hero-note">MIT licensed · clone, run, modify · no servers of mine, no feed, no followers.</p>
+      </div>
+
+      <!-- the actual chat screen, built in HTML inside an iPhone-shaped bezel -->
+      <div class="phone" aria-label="The me. chat screen — talking to your journal about a visit to the Taj Mahal">
+        <span class="phone-glow" aria-hidden="true"></span>
+        <div class="phone-screen">
+          <div class="scr" role="region" aria-label="Chat with me.">
+            <div class="scr-bar">
+              <div class="scr-brand-row">
+                <span class="scr-mark">M.</span>
+                <span class="scr-listening"><span class="dot" aria-hidden="true"></span>Listening</span>
+              </div>
+              <span class="scr-pill" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="7" rx="1.6"/>
+                  <rect x="14" y="3" width="7" height="7" rx="1.6"/>
+                  <rect x="3" y="14" width="7" height="7" rx="1.6"/>
+                  <rect x="14" y="14" width="7" height="7" rx="1.6"/>
+                </svg>
+                Logs
+              </span>
+            </div>
+
+            <div class="scr-thread">
+              <div class="scr-b user">Just got back from Agra. The morning light on the marble was unreal.</div>
+              <span class="scr-time">9:54 pm</span>
+
+              <span class="scr-time left">9:54 pm</span>
+              <div class="scr-b me">Beautiful. Want me to file this under <em>Travel · India</em>, or start a new "Agra" thread?</div>
+
+              <div class="scr-b user">I went to Tajmahal last week</div>
+              <span class="scr-time">9:59 pm</span>
+
+              <span class="scr-time left">9:59 pm</span>
+              <div class="scr-b me">I've recorded your visit to the Taj Mahal on May 9th, 2026. If you'd like to add any details about that experience, feel free to share!</div>
+
+              <div class="scr-log">
+                <span class="scr-log-meta">
+                  <span class="ic" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.4L19 9l-5.4 1.6L12 16l-1.6-5.4L5 9l5.4-1.6L12 2zm7 12l.8 2.6L22 17l-2.2.4L19 20l-.8-2.6L16 17l2.2-.4L19 14zm-13 3l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6.6-1.9z"/></svg>
+                  </span>
+                  Logged<span class="sp">·</span>May 9<span class="sp">·</span>
+                  <span class="ic" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.6 7-12a7 7 0 1 0-14 0c0 4.4 7 12 7 12z"/><circle cx="12" cy="10" r="2.4"/></svg>
+                  </span>
+                  Taj Mahal
+                </span>
+                <div class="scr-log-title">Visited the Taj Mahal</div>
+                <span class="scr-log-tag">Journal</span>
+              </div>
+            </div>
+
+            <div class="scr-composer">
+              <span class="scr-iconbtn" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="5" width="18" height="16" rx="2.4"/>
+                  <path d="M3 9h18"/>
+                  <path d="M8 3v4M16 3v4"/>
+                </svg>
+              </span>
+              <span class="scr-iconbtn round" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+              </span>
+              <span class="scr-composer-text">Recall a moment…</span>
+              <span class="scr-iconbtn bare" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="3" width="6" height="12" rx="3"/>
+                  <path d="M5 11a7 7 0 0 0 14 0"/>
+                  <path d="M12 18v3"/>
+                </svg>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-quiet" id="how">
+    <div class="container">
+      <div class="section-head">
+        <span class="section-label">What it does</span>
+        <h2 class="section-title">Three quiet things, done well.</h2>
+        <p class="section-copy">One surface to capture a life as it happens. One to browse it later. A memory layer that makes recall feel like a conversation, not a folder hunt.</p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="step">01 · Capture</span>
+          <h3>Write before the thought slips away.</h3>
+          <p>Send a line, drop a photo, leave a voice note. Same thread, no mode switch.</p>
+          <div class="mini" aria-hidden="true">
+            <div class="mini-row">
+              <span class="who">You</span>
+              <span class="what">Talked to Dadi. Need to ask about the old recipe next Sunday.</span>
+            </div>
+            <div class="mini-row">
+              <span class="who">me.</span>
+              <span class="what"><em>Logged — Family · May 17</em></span>
+            </div>
+            <div class="tag-row">
+              <span class="tag">Photo</span>
+              <span class="tag">Reminder</span>
+              <span class="tag mint">Voice note</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-card">
+          <span class="step">02 · Recall</span>
+          <h3>Ask in plain language, not folder names.</h3>
+          <p>Search by meaning, date, tag, or a half-remembered phrase. The log stays tidy.</p>
+          <div class="mini" aria-hidden="true">
+            <div class="mini-row">
+              <span class="who">You</span>
+              <span class="what">What did I say about the place with the winter broth?</span>
+            </div>
+            <div class="mini-row">
+              <span class="who">me.</span>
+              <span class="what"><em>Found 1 entry — March 12, Shibuya. "Tiny six-seat counter. Asked for seconds."</em></span>
+            </div>
+            <div class="tag-row">
+              <span class="tag">March 12</span>
+              <span class="tag">Shibuya</span>
+              <span class="tag">Travel</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-card">
+          <span class="step">03 · Remind</span>
+          <h3>Set a future nudge in the same breath.</h3>
+          <p>If the thought belongs in the future, say when. me. brings it back at the right time.</p>
+          <div class="mini" aria-hidden="true">
+            <div class="mini-row">
+              <span class="who">You</span>
+              <span class="what">Remind me to call Mum on Sunday before coffee.</span>
+            </div>
+            <div class="mini-row">
+              <span class="who">me.</span>
+              <span class="what"><em>Queued — Sunday, 9:00 am.</em></span>
+            </div>
+            <div class="tag-row">
+              <span class="tag">Sunday 9:00 am</span>
+              <span class="tag mint">Family</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="log-section" id="log">
+    <div class="container">
+      <div class="log-split">
+        <div class="log-copy">
+          <span class="section-label">A second screen</span>
+          <h2 class="section-title">Your memory, <em>browsable.</em></h2>
+          <p class="section-copy">Tap into the log. The same dark canvas, the same vocabulary — only now you can scrub through everything you've ever told yourself.</p>
+          <ul class="log-bullets">
+            <li>
+              <strong>Search by meaning, date, or tag</strong>
+              <span>"Place with the winter broth" pulls back March 12, Shibuya.</span>
+            </li>
+            <li>
+              <strong>One tidy timeline</strong>
+              <span>Every thought, top to bottom. No folders, no nesting, no nesting of nesting.</span>
+            </li>
+            <li>
+              <strong>Tap an entry to drop back in</strong>
+              <span>Reopen a moment as a thread. Add a follow-up. Set a future reminder.</span>
+            </li>
+          </ul>
+        </div>
+        <div class="phone" aria-label="The me. log screen — a searchable timeline of journal entries">
+          <span class="phone-glow" aria-hidden="true"></span>
+          <div class="phone-screen">
+            <div class="scr" role="region" aria-label="Browse your memory">
+              <div class="scr-log-head">
+                <span class="scr-back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M15 6l-6 6 6 6"/>
+                  </svg>
+                  Back
+                </span>
+                <span class="scr-wordmark">Log.</span>
+                <span class="scr-spacer" aria-hidden="true"></span>
+              </div>
+
+              <div class="scr-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7"/>
+                  <path d="M20 20l-3.5-3.5"/>
+                </svg>
+                <span>Search logs by date, tag, or text…</span>
+              </div>
+
+              <div class="scr-list">
+                <article class="scr-card">
+                  <span class="stamp">May 16</span>
+                  <span class="t-sans">Started working in the Me app.</span>
+                </article>
+
+                <div class="scr-row">
+                  <article class="scr-card">
+                    <span class="stamp">May 16</span>
+                    <span class="t-serif">Having lunch — sat outside, finally warm.</span>
+                  </article>
+                  <article class="scr-card">
+                    <span class="stamp">May 16</span>
+                    <span class="t-serif">Worked on Onyx for 2 hours.</span>
+                  </article>
+                </div>
+
+                <article class="scr-card">
+                  <span class="stamp">May 12</span>
+                  <span class="t-serif">Mum called. Said the lemons came in. Bring an empty bag next Sunday.</span>
+                </article>
+
+                <article class="scr-card">
+                  <span class="stamp">May 09</span>
+                  <span class="place">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M12 22s7-7.6 7-12a7 7 0 1 0-14 0c0 4.4 7 12 7 12z"/>
+                      <circle cx="12" cy="10" r="2.4"/>
+                    </svg>
+                    Taj Mahal
+                  </span>
+                  <span class="t-sans">Visited the Taj Mahal.</span>
+                </article>
+
+                <span class="scr-end">End of records</span>
+                <span class="scr-fade" aria-hidden="true"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="privacy" id="privacy">
+    <div class="container">
+      <div class="privacy-grid">
+        <div>
+          <span class="section-label">Privacy</span>
+          <h2>A journal built for <em>one person</em> — you.</h2>
+          <p class="lead">Single-user by design. End-to-end yours. me. is not a feed, not a workspace, not a place to perform. It is a private memory layer for your own life.</p>
+        </div>
+        <div class="privacy-list">
+          <div class="privacy-item">
+            <span class="kicker">Private by default</span>
+            <strong>Your journal is for you.</strong>
+            <span>Not a stream, not a community. There is no public view of any entry, ever.</span>
+          </div>
+          <div class="privacy-item">
+            <span class="kicker">Runs on your machine</span>
+            <strong>Self-hosted, your data on disk.</strong>
+            <span>The code is open. Clone the repo, run it locally, point it at the model you trust. Nothing leaves unless you wire it that way.</span>
+          </div>
+          <div class="privacy-item">
+            <span class="kicker">Memory you can query</span>
+            <strong>Ask anything, anytime.</strong>
+            <span>Recall by date, by tag, by meaning. Get the moment back, not a stack of files to search.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="closing" id="quickstart">
+    <div class="container">
+      <div class="closing-card">
+        <div>
+          <span class="section-label">Quickstart</span>
+          <h2>Clone it. Run it. <em>Keep it.</em></h2>
+          <p>me. is open source. Pull the repo, point it at a model, and the journal runs on your machine — no account, no signup, no servers of mine in the loop.</p>
+          <div class="store-row" style="margin-top:28px;">
+            <a class="store-btn is-primary" href="https://github.com/your-username/me" target="_blank" rel="noopener" aria-label="View source on GitHub">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.78-.25.78-.56v-2.16c-3.2.7-3.87-1.54-3.87-1.54-.52-1.34-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.25 3.34.96.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11 11 0 0 1 2.9-.39c.98 0 1.97.13 2.9.39 2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.66.79.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/>
+              </svg>
+              <span class="store-text"><small>View source on</small><strong>GitHub</strong></span>
+            </a>
+            <a class="store-btn" href="https://github.com/your-username/me#readme" target="_blank" rel="noopener" aria-label="Read the docs">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5z"/>
+                <path d="M14 3v6h6"/>
+                <path d="M8 13h8M8 17h6"/>
+              </svg>
+              <span class="store-text"><small>Read the</small><strong>Documentation</strong></span>
+            </a>
+          </div>
+        </div>
+        <div>
+          <pre class="quickstart" aria-label="Install instructions"><code><span class="line"><span class="comment"># clone the repo</span></span><span class="line"><span class="prompt">$</span><span class="tok">git</span> clone https://github.com/your-username/me</span><span class="line"><span class="prompt">$</span><span class="tok">cd</span> me</span><span class="line"></span><span class="line"><span class="comment"># install &amp; start</span></span><span class="line"><span class="prompt">$</span><span class="tok">npm</span> install</span><span class="line"><span class="prompt">$</span><span class="tok">npm</span> run dev</span><span class="line"></span><span class="line"><span class="comment"># open the journal</span></span><span class="line"><span class="prompt">→</span> http://localhost:3000</span></code></pre>
+          <div class="quickstart-foot">Node 20+ · MIT licensed · your data stays on disk</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <span class="wm"><span class="brand-mark" style="width:30px;height:30px;font-size:16px;">M.</span> me.</span>
+    <div class="footer-links">
+      <a href="#how">How it works</a>
+      <a href="#log">Log</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="https://github.com/your-username/me" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <span style="color:var(--muted-soft);">Open source · MIT · a notebook that talks back.</span>
+  </div>
+</footer>
+</body>
+</html>

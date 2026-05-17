@@ -1,0 +1,1195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>me. - the journal that talks back</title>
+<meta name="description" content="me. is a private, chat-first journal that remembers everything for you. Capture thoughts, attach photos, set reminders, and ask what you said about anything later.">
+<style>
+  :root {
+    --bg: #121212;
+    --bg-deep: #0f0f0f;
+    --surface: #151515;
+    --surface-2: #1a1a1a;
+    --surface-3: #202020;
+    --paper: #d4d4ce;
+    --ivory: #ece9e1;
+    --fg: #d4d4ce;
+    --fg-strong: #ece9e1;
+    --ink: #141413;
+    --muted: #8f8f89;
+    --muted-soft: #767671;
+    --border: #292928;
+    --border-strong: #343432;
+    --accent: #69cd9c;
+    --accent-deep: #285541;
+    --accent-soft: #5eb88c;
+    --accent-wash: rgba(105, 205, 156, 0.14);
+
+    --font-display: "Iowan Old Style", "Charter", Georgia, serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Avenir Next", system-ui, sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+    --shadow-1: 0 28px 70px -44px rgba(0, 0, 0, 0.8);
+    --shadow-2: 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+    --radius-xl: 32px;
+    --radius-lg: 28px;
+    --radius-md: 20px;
+    --radius-pill: 999px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html {
+    background: var(--bg-deep);
+    color-scheme: dark;
+  }
+  body {
+    background:
+      radial-gradient(circle at top center, rgba(255, 255, 255, 0.045), transparent 24%),
+      radial-gradient(circle at 16% 0%, rgba(105, 205, 156, 0.06), transparent 18%),
+      linear-gradient(180deg, #151514 0%, #121212 24%, #121212 100%);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; text-decoration: none; }
+  button, input { font: inherit; }
+  img, svg { display: block; max-width: 100%; }
+  h1, h2, h3, p { margin: 0; }
+  ::selection { background: var(--accent); color: var(--ivory); }
+
+  .page-shell {
+    position: relative;
+    overflow: clip;
+  }
+  .page-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 620px;
+    background:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.025), transparent 120px),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0 22px,
+        rgba(255, 255, 255, 0.02) 22px 23px,
+        transparent 23px 46px
+      );
+    opacity: 0.36;
+    pointer-events: none;
+  }
+
+  .container {
+    width: min(1200px, calc(100% - 40px));
+    margin: 0 auto;
+  }
+  @media (min-width: 820px) {
+    .container { width: min(1200px, calc(100% - 72px)); }
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(18, 18, 18, 0.78);
+    backdrop-filter: blur(14px) saturate(160%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .topbar-inner {
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--fg-strong);
+  }
+  .brand-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border-strong);
+    background: rgba(255, 255, 255, 0.02);
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-style: italic;
+    line-height: 1;
+  }
+  .brand-word {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .brand-word .dot { color: inherit; }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .nav-link {
+    padding: 10px 16px;
+    border-radius: var(--radius-pill);
+    color: var(--muted);
+    transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+  }
+  .nav-link:hover {
+    color: var(--fg);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .nav-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: var(--radius-pill);
+    color: var(--fg-strong);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-2);
+  }
+  .nav-cta .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 6px var(--accent-wash);
+  }
+
+  .hero {
+    padding: 72px 0 112px;
+    position: relative;
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: center;
+    gap: 56px;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    color: var(--muted-soft);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 6px var(--accent-wash);
+  }
+  .hero-title {
+    max-width: 10ch;
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(3.25rem, 8vw, 6.4rem);
+    font-weight: 500;
+    line-height: 0.98;
+    letter-spacing: -0.05em;
+    text-wrap: balance;
+  }
+  .hero-title em {
+    color: var(--paper);
+    font-style: italic;
+  }
+  .lede {
+    max-width: 36ch;
+    margin-top: 24px;
+    color: var(--fg);
+    font-family: var(--font-display);
+    font-size: clamp(1.18rem, 1.6vw, 1.5rem);
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+  .hero-meta {
+    margin-top: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .meta-chip {
+    padding: 8px 14px;
+    border-radius: var(--radius-pill);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+  .store-row {
+    margin-top: 34px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .store-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 188px;
+    padding: 13px 18px 13px 15px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--fg-strong);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: var(--shadow-2);
+    transition: transform 160ms ease, filter 160ms ease, border-color 160ms ease, background 160ms ease;
+  }
+  .store-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+  .store-btn.is-primary {
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: var(--shadow-1);
+  }
+  .store-btn.is-secondary {
+    background: rgba(255, 255, 255, 0.015);
+    color: var(--fg);
+  }
+  .store-btn svg {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+  }
+  .store-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.05;
+  }
+  .store-text small {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, currentColor 48%, transparent);
+    margin-bottom: 4px;
+  }
+  .store-text strong {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .hero-note {
+    margin-top: 18px;
+    color: var(--muted-soft);
+    font-size: 14px;
+  }
+
+  .stage-wrap {
+    position: relative;
+  }
+  .stage-frame {
+    position: relative;
+    padding: 28px;
+    border-radius: 42px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+      var(--surface);
+    box-shadow: var(--shadow-1), var(--shadow-2);
+    overflow: hidden;
+  }
+  .stage-frame::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 180px;
+    background:
+      radial-gradient(circle at top center, rgba(255, 255, 255, 0.06), transparent 60%),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0 18px,
+        rgba(255, 255, 255, 0.018) 18px 19px,
+        transparent 19px 38px
+      );
+    pointer-events: none;
+  }
+  .stage-caption {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    position: relative;
+    z-index: 1;
+  }
+  .stage-caption strong {
+    color: var(--fg-strong);
+    font-weight: 500;
+  }
+  .shot-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.02fr) minmax(240px, 0.78fr);
+    gap: 18px;
+    align-items: end;
+    position: relative;
+    z-index: 1;
+  }
+  .shot-card {
+    position: relative;
+    margin: 0;
+    overflow: hidden;
+    border-radius: 38px;
+    border: 1px solid var(--border-strong);
+    background: #0f0f0f;
+    box-shadow: 0 32px 70px -56px rgba(0, 0, 0, 0.9), var(--shadow-2);
+  }
+  .shot-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .shot-card-side {
+    max-width: 360px;
+    justify-self: end;
+    margin-bottom: 40px;
+  }
+  .stage-notes {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    position: relative;
+    z-index: 1;
+  }
+  .stage-note {
+    padding: 16px 18px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.018);
+  }
+  .stage-note small {
+    display: block;
+    margin-bottom: 10px;
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .stage-note strong {
+    display: block;
+    color: var(--fg);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .surface {
+    border-radius: var(--radius-xl);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0)),
+      var(--surface-2);
+    padding: 20px;
+    min-width: 0;
+  }
+  .surface-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .identity {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .identity-badge {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid var(--border-strong);
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-style: italic;
+    color: var(--fg-strong);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .identity-copy strong,
+  .logs-wordmark {
+    display: block;
+    color: var(--fg-strong);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .identity-copy span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0.35);
+    animation: pulse 1.8s ease-out infinite;
+  }
+  @keyframes pulse {
+    70% { box-shadow: 0 0 0 8px rgba(217, 119, 87, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(217, 119, 87, 0); }
+  }
+  .ghost-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    border-radius: var(--radius-pill);
+    color: var(--fg);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .ghost-pill svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .thread {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 100%;
+  }
+  .bubble {
+    max-width: 92%;
+    border-radius: 28px;
+    padding: 18px 20px;
+    line-height: 1.45;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .bubble.user {
+    align-self: flex-end;
+    background: var(--paper);
+    color: var(--ink);
+    border-bottom-right-radius: 10px;
+    font-size: clamp(1rem, 1.8vw, 1.1rem);
+    font-weight: 500;
+  }
+  .bubble.me {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--fg);
+    border-bottom-left-radius: 10px;
+  }
+  .bubble-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .bubble.me p {
+    font-family: var(--font-body);
+    font-size: 16px;
+  }
+  .bubble-time {
+    display: block;
+    margin-top: 10px;
+    color: var(--muted-soft);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .memory-entry {
+    margin-top: auto;
+    border-radius: 26px;
+    padding: 18px 18px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.01);
+  }
+  .memory-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .memory-title {
+    margin-top: 12px;
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(1.2rem, 2vw, 1.48rem);
+    line-height: 1.2;
+  }
+  .memory-tag {
+    margin-top: 14px;
+    display: inline-flex;
+    padding: 8px 12px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .composer {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: var(--radius-pill);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .composer-actions {
+    display: inline-flex;
+    gap: 8px;
+  }
+  .icon-circle {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--fg);
+  }
+  .icon-circle svg {
+    width: 16px;
+    height: 16px;
+  }
+  .composer-text {
+    flex: 1;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .logs-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .logs-wordmark {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-style: italic;
+    letter-spacing: -0.03em;
+    text-transform: none;
+  }
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.015);
+    color: var(--muted);
+  }
+  .search svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+  }
+  .search-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 15px;
+  }
+  .log-list {
+    display: grid;
+    gap: 12px;
+  }
+  .log-card {
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.015);
+    padding: 18px;
+    min-width: 0;
+    transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+  }
+  .log-card.is-active {
+    border-color: rgba(212, 212, 206, 0.18);
+    background: rgba(255, 255, 255, 0.03);
+    transform: translateY(-1px);
+  }
+  .log-card small {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .log-card strong {
+    display: block;
+    color: var(--fg);
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.35;
+  }
+  .log-card em {
+    display: block;
+    margin-top: 18px;
+    color: var(--fg);
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-style: italic;
+    line-height: 1.35;
+  }
+  .log-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .log-card.tall {
+    min-height: 156px;
+  }
+  .section-paper {
+    position: relative;
+    margin-top: 40px;
+    background:
+      radial-gradient(circle at top center, rgba(105, 205, 156, 0.05), transparent 28%),
+      linear-gradient(180deg, #141414 0%, #121212 100%);
+    color: var(--fg);
+    border-top-left-radius: 42px;
+    border-top-right-radius: 42px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 104px 0;
+  }
+  .section-label {
+    margin-bottom: 18px;
+    color: var(--accent);
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .section-title {
+    max-width: 14ch;
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 6vw, 4.2rem);
+    font-weight: 500;
+    line-height: 1.02;
+    letter-spacing: -0.05em;
+    text-wrap: balance;
+  }
+  .section-copy {
+    margin-top: 18px;
+    max-width: 42ch;
+    color: var(--fg);
+    font-size: clamp(1.02rem, 1.8vw, 1.22rem);
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+  .feature-grid {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+  .feature-card {
+    min-width: 0;
+    padding: 24px;
+    border-radius: 30px;
+    background: rgba(255, 255, 255, 0.018);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: var(--shadow-2);
+  }
+  .feature-card small {
+    display: block;
+    margin-bottom: 18px;
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .feature-card h3 {
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(1.7rem, 2.6vw, 2.1rem);
+    font-weight: 500;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    margin-bottom: 14px;
+  }
+  .feature-card p {
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1.65;
+  }
+  .mini-ui {
+    margin-top: 22px;
+    padding: 18px;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .mini-ui .mini-label {
+    color: var(--muted-soft);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .mini-ui .mini-body {
+    margin-top: 12px;
+    color: var(--fg);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .mini-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .mini-tag {
+    padding: 7px 11px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--fg);
+    font-size: 12px;
+  }
+
+  .privacy-band {
+    padding: 104px 0;
+    background:
+      radial-gradient(circle at center top, rgba(105, 205, 156, 0.08), transparent 36%),
+      var(--bg);
+  }
+  .privacy-panel {
+    padding: 34px;
+    border-radius: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01)),
+      var(--surface);
+    box-shadow: var(--shadow-1), var(--shadow-2);
+  }
+  .privacy-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .privacy-panel h2 {
+    max-width: 14ch;
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(2.3rem, 5vw, 4rem);
+    font-weight: 500;
+    line-height: 1.03;
+    letter-spacing: -0.05em;
+  }
+  .privacy-panel p {
+    margin-top: 18px;
+    max-width: 44ch;
+    color: var(--fg);
+    font-size: 18px;
+  }
+  .privacy-list {
+    display: grid;
+    gap: 12px;
+  }
+  .privacy-item {
+    padding: 18px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.015);
+  }
+  .privacy-item strong {
+    display: block;
+    color: var(--fg-strong);
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .privacy-item span {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .closing {
+    padding: 0 0 96px;
+    background: var(--bg);
+  }
+  .closing-card {
+    padding: 42px 36px;
+    border-radius: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01)),
+      var(--surface);
+    box-shadow: var(--shadow-1), var(--shadow-2);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 24px;
+    align-items: center;
+  }
+  .closing-card h2 {
+    color: var(--fg-strong);
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4.8vw, 3.6rem);
+    font-weight: 500;
+    line-height: 1.04;
+    letter-spacing: -0.05em;
+  }
+  .closing-card p {
+    margin-top: 12px;
+    max-width: 34ch;
+    color: var(--fg);
+    font-size: 17px;
+  }
+  .footer {
+    padding: 24px 0 52px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .footer-inner {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .footer-links {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .footer-links a:hover { color: var(--fg); }
+
+  @media (max-width: 1180px) {
+    .hero-grid,
+    .shot-grid,
+    .privacy-grid,
+    .closing-card {
+      grid-template-columns: 1fr;
+    }
+    .hero-title { max-width: 12ch; }
+  }
+
+  @media (max-width: 920px) {
+    .feature-grid {
+      grid-template-columns: 1fr;
+    }
+    .stage-notes {
+      grid-template-columns: 1fr;
+    }
+    .section-paper {
+      border-top-left-radius: 32px;
+      border-top-right-radius: 32px;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .topbar-inner {
+      min-height: 64px;
+    }
+    .nav-links .nav-link {
+      display: none;
+    }
+    .hero {
+      padding: 48px 0 80px;
+    }
+    .stage-frame,
+    .privacy-panel,
+    .closing-card {
+      padding: 20px;
+      border-radius: 28px;
+    }
+    .surface {
+      padding: 16px;
+      border-radius: 24px;
+    }
+    .brand-word {
+      font-size: 24px;
+    }
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      font-size: 24px;
+    }
+    .shot-card-side {
+      max-width: none;
+      margin-bottom: 0;
+    }
+    .log-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .container {
+      width: min(100% - 24px, 100%);
+    }
+    .store-btn {
+      width: 100%;
+      justify-content: flex-start;
+    }
+    .bubble {
+      max-width: 100%;
+      padding: 16px;
+    }
+    .section-paper,
+    .privacy-band {
+      padding-top: 76px;
+      padding-bottom: 76px;
+    }
+    .closing {
+      padding-bottom: 72px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="page-shell">
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="#top" aria-label="me. home">
+        <span class="brand-mark">M.</span>
+        <span class="brand-word">me<span class="dot">.</span></span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a class="nav-link" href="#how">How it works</a>
+        <a class="nav-link" href="#privacy">Privacy</a>
+        <a class="nav-cta" href="#download"><span class="dot" aria-hidden="true"></span>Get the app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="top">
+      <div class="container hero-grid">
+        <div>
+          <div class="eyebrow">Private chat-first journal</div>
+          <h1 class="hero-title">The journal that <em>talks back.</em></h1>
+          <p class="lede">Capture a thought as fast as a text. Add a photo. Set a reminder. Weeks later, ask what you said about Taj Mahal, a hard week, or that place with the winter broth. me. remembers in your own words.</p>
+          <div class="hero-meta" aria-label="Product summary">
+            <span class="meta-chip">One screen to talk</span>
+            <span class="meta-chip">One screen to browse memory</span>
+            <span class="meta-chip">Single-user by design</span>
+          </div>
+          <div class="store-row" id="download">
+            <a class="store-btn is-primary" href="#" aria-label="Download on the App Store">
+              <svg viewBox="0 0 384 512" fill="currentColor" aria-hidden="true">
+                <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
+              </svg>
+              <span class="store-text">
+                <small>Download on the</small>
+                <strong>App Store</strong>
+              </span>
+            </a>
+            <a class="store-btn is-secondary" href="#" aria-label="Get it on Google Play">
+              <svg viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+                <path d="M325.3 234.3 104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l280.8-161.2-60.1-60.1L104.6 499z"/>
+              </svg>
+              <span class="store-text">
+                <small>Get it on</small>
+                <strong>Google Play</strong>
+              </span>
+            </a>
+          </div>
+          <p class="hero-note">Quiet graphite surfaces. Linen text. One small signal color. The landing now follows the product instead of styling around it.</p>
+        </div>
+
+        <div class="stage-wrap">
+          <div class="stage-frame">
+            <div class="stage-caption">
+              <span>From the real app</span>
+              <strong>One screen to talk. One screen to browse your memory.</strong>
+            </div>
+            <div class="shot-grid">
+              <figure class="shot-card shot-card-main">
+                <img src="mp8nfqs1-Screenshot-2026-05-16-at-11.27.41-PM.png" alt="The Me chat screen showing a message about visiting the Taj Mahal, a saved memory card, and the calm bottom composer." loading="lazy">
+              </figure>
+              <figure class="shot-card shot-card-side">
+                <img src="mp8ng1aw-Screenshot-2026-05-16-at-11.27.54-PM.png" alt="The Me memory browser showing searchable logs, quiet card outlines, and the Log wordmark." loading="lazy">
+              </figure>
+            </div>
+
+            <div class="stage-notes">
+              <div class="stage-note">
+                <small>Talk</small>
+                <strong>Capture a thought in the same soft thread where reminders, photos, and answers already live.</strong>
+              </div>
+              <div class="stage-note">
+                <small>Browse</small>
+                <strong>Search by date, tag, or text later, with the same quiet chrome and the same memory vocabulary.</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-paper" id="how">
+      <div class="container">
+        <div class="section-label">What it does</div>
+        <h2 class="section-title">Three quiet things, done well.</h2>
+        <p class="section-copy">The product is simple on purpose: one surface to capture a life as it happens, one surface to browse it later, and a memory layer that makes recall feel conversational instead of clerical.</p>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <small>01 - Capture</small>
+            <h3>Write before the thought slips away.</h3>
+            <p>Type a line, drop in a photo, or leave yourself a reminder without switching modes. The product keeps the entry ritual as light as sending a text.</p>
+            <div class="mini-ui">
+              <div class="mini-label">Quick add</div>
+              <div class="mini-body">"Talked to Dadi. Need to ask about the old recipe next Sunday."</div>
+              <div class="mini-tags">
+                <span class="mini-tag">Photo</span>
+                <span class="mini-tag">Reminder</span>
+                <span class="mini-tag">Voice note</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <small>02 - Recall</small>
+            <h3>Ask in plain language, not folder names.</h3>
+            <p>Search by meaning, date, tag, or a half-remembered phrase. The memory browser stays tidy while the chat surface does the heavy lifting.</p>
+            <div class="mini-ui">
+              <div class="mini-label">Browse memory</div>
+              <div class="mini-body">"What did I say about the place with the winter broth?"</div>
+              <div class="mini-tags">
+                <span class="mini-tag">March 12</span>
+                <span class="mini-tag">Shibuya</span>
+                <span class="mini-tag">Travel</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <small>03 - Remind</small>
+            <h3>Set a future nudge in the same breath.</h3>
+            <p>No separate reminder flow. If the thought belongs in the future, say when. me. keeps the request inside the thread and brings it back at the right time.</p>
+            <div class="mini-ui">
+              <div class="mini-label">Scheduled</div>
+              <div class="mini-body">"Call Mum" queued for Sunday morning, before coffee.</div>
+              <div class="mini-tags">
+                <span class="mini-tag">Sunday 9:00 am</span>
+                <span class="mini-tag">Personal</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="privacy-band" id="privacy">
+      <div class="container">
+        <div class="privacy-panel">
+          <div class="privacy-grid">
+            <div>
+              <div class="section-label">Privacy</div>
+              <h2>A journal built for one person: you.</h2>
+              <p>Single-user by design. End-to-end yours. me. is not a social feed, a shared workspace, or a place to perform. It is a private memory layer for your own life.</p>
+            </div>
+            <div class="privacy-list">
+              <div class="privacy-item">
+                <strong>Private by default</strong>
+                <span>Your journal is for keeping track of your own life, not producing content for anyone else.</span>
+              </div>
+              <div class="privacy-item">
+                <strong>One calm system</strong>
+                <span>Chat, memory, reminders, and attachments live in one place instead of four disconnected apps.</span>
+              </div>
+              <div class="privacy-item">
+                <strong>Memory you can query</strong>
+                <span>Ask "what did I say about..." anytime and get back the moment, not a stack of files to search manually.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing">
+      <div class="container">
+        <div class="closing-card">
+          <div>
+            <h2>Carry your memory with you.</h2>
+            <p>Download me. and keep one quiet place for the things you want to remember, revisit, and ask again later.</p>
+          </div>
+          <div class="store-row">
+            <a class="store-btn is-primary" href="#" aria-label="Download on the App Store">
+              <svg viewBox="0 0 384 512" fill="currentColor" aria-hidden="true">
+                <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
+              </svg>
+              <span class="store-text">
+                <small>Download on the</small>
+                <strong>App Store</strong>
+              </span>
+            </a>
+            <a class="store-btn is-secondary" href="#" aria-label="Get it on Google Play">
+              <svg viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+                <path d="M325.3 234.3 104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l280.8-161.2-60.1-60.1L104.6 499z"/>
+              </svg>
+              <span class="store-text">
+                <small>Get it on</small>
+                <strong>Google Play</strong>
+              </span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>me. - a notebook that talks back.</div>
+      <div class="footer-links">
+        <a href="#how">How it works</a>
+        <a href="#privacy">Privacy</a>
+        <a href="mailto:hello@me.app">Contact</a>
+      </div>
+    </div>
+  </footer>
+</div>
+
+</body>
+</html>

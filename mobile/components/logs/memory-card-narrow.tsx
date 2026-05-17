@@ -22,7 +22,7 @@ export function MemoryCardNarrow({ memory, onPress }: Props) {
         transform: [{ scale: pressed ? 0.985 : 1 }],
       })}
     >
-      <View className="min-h-[140px] rounded-2xl border border-border-subtle bg-surface p-5">
+      <View className="rounded-2xl border border-border-subtle bg-surface p-5">
         <View className="mb-3 flex-row items-start justify-between">
           <View className="gap-1">
             <Text
