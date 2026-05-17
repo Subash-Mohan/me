@@ -1,6 +1,6 @@
 COMPOSE := docker compose -f docker/docker-compose.yml
 
-.PHONY: up down logs psql migrate revision current dev test test-db-create test-db-migrate test-db-reset lint format typecheck check
+.PHONY: up down logs psql migrate revision current dev mobile test test-db-create test-db-migrate test-db-reset lint format typecheck check
 
 up:
 	$(COMPOSE) up -d
@@ -25,8 +25,11 @@ revision:
 current:
 	uv run alembic current
 
-dev:
+be:
 	uv run uvicorn app.main:app --reload
+
+mobile:
+	pnpm --filter mobile exec expo start --port 19000 --ios --clear
 
 test:
 	uv run pytest

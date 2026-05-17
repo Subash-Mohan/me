@@ -20,6 +20,7 @@ def reset_db() -> None:
         conn.execute(text("TRUNCATE TABLE messages CASCADE"))
         conn.execute(text("TRUNCATE TABLE sessions CASCADE"))
         conn.execute(text("TRUNCATE TABLE memories CASCADE"))
+        conn.execute(text("TRUNCATE TABLE auth_throttles CASCADE"))
         conn.execute(text("TRUNCATE TABLE users RESTART IDENTITY CASCADE"))
 
 

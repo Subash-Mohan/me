@@ -1,3 +1,4 @@
+from app.models.auth_throttle import AuthThrottle  # noqa: F401
 from app.models.memory import Memory  # noqa: F401
 from app.models.message import Message  # noqa: F401
 from app.models.session import Session  # noqa: F401

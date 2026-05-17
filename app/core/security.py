@@ -65,10 +65,11 @@ _UNAUTHORIZED = HTTPException(
 )
 
 
-def client_ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for")
-    if fwd:
-        return fwd.split(",")[0].strip()
+def client_ip(request: Request, settings: Settings) -> str:
+    if settings.trust_proxy_headers:
+        fwd = request.headers.get("x-forwarded-for")
+        if fwd:
+            return fwd.split(",")[0].strip()
     if request.client:
         return request.client.host
     return "unknown"

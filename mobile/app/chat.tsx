@@ -1,7 +1,9 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AsteroidField } from "@/components/chat/asteroid-field";
 import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatInput } from "@/components/chat/chat-input";
 import { MessageList } from "@/components/chat/message-list";
@@ -33,6 +35,15 @@ export default function ChatScreen() {
 
   return (
     <View className="flex-1 bg-[#121212]">
+      <LinearGradient
+        colors={["#1f1f1f", "#141414", "#070707"]}
+        locations={[0, 0.5, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
+      <AsteroidField />
       <MessageList
         messages={chat.messages}
         onScrollTopReached={chat.hasOlder ? chat.fetchOlder : undefined}

@@ -107,6 +107,7 @@ These apply everywhere unless a phase file explicitly overrides them.
 - **Logging.** Structured (`structlog`) at INFO+; never log message content, image bytes, or passphrases.
 - **Errors.** Raise FastAPI `HTTPException` only at the API boundary; services raise typed domain errors.
 - **Comments.** Default to none. Add only where the *why* is non-obvious.
+- **Theme tokens, not raw hex.** In the mobile client, never inline hex colors in JS props (e.g. `color="#000000"` on a lucide icon, `backgroundColor: "#1A1A1A"` in a style object). Reference the shared theme: `import { colors } from "@/theme"` and use `colors.background`, `colors.foreground.secondary`, etc. The same `mobile/theme.js` is the source of truth for `mobile/tailwind.config.js`, so NativeWind classes (`bg-surface-raised`, `text-foreground-muted`) and JS-prop colors stay in lockstep. Add a new token to `mobile/theme.js` before introducing a new color.
 
 ---
 

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { ImagePreviewRow } from "@/components/chat/image-preview-row";
 import { IconButton } from "@/components/ui/icon-button";
+import { colors } from "@/theme";
 
 type Props = {
   onSend: (text: string, images?: string[]) => void;
@@ -72,7 +73,7 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
             <View className="flex-row items-center gap-3 px-2 py-1.5">
               <IconButton
                 onPress={pickImages}
-                variant="muted"
+                variant="raised"
                 size={48}
                 accessibilityLabel="Attach image"
               >
@@ -97,17 +98,17 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
                   accessibilityLabel="Send"
                 >
                   <View
-                    className="bg-black"
                     style={{
-                      width: 12,
-                      height: 12,
+                      width: 14,
+                      height: 14,
+                      backgroundColor: colors.background,
                       transform: [{ rotate: "45deg" }],
                     }}
                   />
                 </IconButton>
               ) : (
                 <IconButton
-                  variant="muted"
+                  variant="raised"
                   size={48}
                   accessibilityLabel="Record audio"
                 >

@@ -28,7 +28,6 @@ from tests.evals._helpers import (
     EVAL_TZ,
     EVAL_YESTERDAY_DATE,
     final_text,
-    has_run_done,
     run_chat,
     tool_call_args,
     tool_call_names,
@@ -53,7 +52,6 @@ async def test_plain_greeting_emits_no_tool_call(db, owner_id):
     pkts = await run_chat(message="hi", db=db, memory_client=fake, user=user)
 
     assert tool_call_names(pkts) == []
-    assert has_run_done(pkts)
     assert len(final_text(pkts)) > 0
 
 

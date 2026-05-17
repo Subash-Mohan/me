@@ -14,6 +14,10 @@ class Settings(BaseSettings):
 
     jwt_secret: SecretStr
     jwt_expires_days: int = 30
+    auth_rate_limit_failures: int = 5
+    auth_rate_limit_window_seconds: int = 900
+    auth_rate_limit_lock_seconds: int = 900
+    trust_proxy_headers: bool = False
 
     supermemory_api_key: SecretStr
     supermemory_base_url: str = "https://api.supermemory.ai"

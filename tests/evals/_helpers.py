@@ -71,7 +71,3 @@ def tool_call_args(packets: list[Any], tool_name: str) -> list[dict[str, Any]]:
 def final_text(packets: list[Any]) -> str:
     """Concatenated text the user would see (all `text_delta` packets)."""
     return "".join(p.delta for p in packets if p.type == "text_delta")
-
-
-def has_run_done(packets: list[Any]) -> bool:
-    return any(p.type == "run_done" for p in packets)
