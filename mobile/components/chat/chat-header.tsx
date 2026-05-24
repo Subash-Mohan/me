@@ -1,16 +1,22 @@
-import { LayoutGrid } from "lucide-react-native";
+import { LayoutGrid, SquarePen } from "lucide-react-native";
 import { MotiView } from "moti";
 import { Text, View } from "react-native";
 import { AvatarMark } from "@/components/ui/avatar-mark";
 import { PillButton } from "@/components/ui/pill-button";
+import { PillIconButton } from "@/components/ui/pill-icon-button";
 import { StatusDot } from "@/components/ui/status-dot";
 
 type Props = {
   onLogsPress?: () => void;
+  onNewSessionPress?: () => void;
   topInset?: number;
 };
 
-export function ChatHeader({ onLogsPress, topInset = 0 }: Props) {
+export function ChatHeader({
+  onLogsPress,
+  onNewSessionPress,
+  topInset = 0,
+}: Props) {
   return (
     <MotiView
       from={{ opacity: 0, translateY: -10 }}
@@ -32,7 +38,14 @@ export function ChatHeader({ onLogsPress, topInset = 0 }: Props) {
           </Text>
         </View>
       </View>
-      <PillButton icon={LayoutGrid} label="Logs" onPress={onLogsPress} />
+      <View className="flex-row items-center gap-2">
+        <PillIconButton
+          icon={SquarePen}
+          accessibilityLabel="New session"
+          onPress={onNewSessionPress}
+        />
+        <PillButton icon={LayoutGrid} label="Logs" onPress={onLogsPress} />
+      </View>
     </MotiView>
   );
 }

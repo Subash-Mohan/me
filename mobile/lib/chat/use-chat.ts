@@ -30,10 +30,13 @@ export type UseChat = {
   fetchOlder: () => void;
   hasOlder: boolean;
   isLoadingHistory: boolean;
+  /** Start a fresh conversation: abort any in-flight stream and clear the
+   *  active session id so the next send creates a new backend session. */
+  newSession: () => void;
 };
 
 export function useChat(): UseChat {
-  const { sessionId, ensureSession } = useChatSession();
+  const { sessionId, ensureSession, clearSession } = useChatSession();
   const history = useChatHistory(sessionId);
   const stream = useChatStream(history.commitTurn);
 
@@ -42,12 +45,22 @@ export function useChat(): UseChat {
       const trimmed = text.trim();
       if (trimmed.length === 0) return;
       void (async () => {
-        const id = await ensureSession();
-        stream.sendMessage(trimmed, id);
+        try {
+          const id = await ensureSession();
+          stream.sendMessage(trimmed, id);
+        } catch {
+          // ensureSession rejects when a concurrent newSession() supersedes
+          // the in-flight create — nothing to do but drop this send.
+        }
       })();
     },
     [ensureSession, stream],
   );
+
+  const newSession = useCallback(() => {
+    stream.stop();
+    clearSession();
+  }, [stream, clearSession]);
 
   // History stays stable across deltas — it only changes on page load or
   // when a turn commits to the cache on `finish`. The adapted result is
@@ -88,5 +101,6 @@ export function useChat(): UseChat {
     fetchOlder: history.fetchOlder,
     hasOlder: history.hasOlder,
     isLoadingHistory: history.isLoading,
+    newSession,
   };
 }

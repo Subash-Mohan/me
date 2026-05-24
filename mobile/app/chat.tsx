@@ -51,6 +51,7 @@ export default function ChatScreen() {
       <ChatHeader
         topInset={insets.top}
         onLogsPress={() => router.push("/logs")}
+        onNewSessionPress={chat.newSession}
       />
       <ChatInput onSend={handleSend} bottomInset={insets.bottom} />
     </View>

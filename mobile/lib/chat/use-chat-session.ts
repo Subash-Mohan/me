@@ -16,6 +16,8 @@ import { useApi } from "@/lib/auth/auth-store";
 export type UseChatSession = {
   sessionId: string | null;
   ensureSession: () => Promise<string>;
+  /** Drop the active session id so the next send creates a fresh one. */
+  clearSession: () => void;
 };
 
 export function useChatSession(): UseChatSession {
@@ -29,18 +31,29 @@ export function useChatSession(): UseChatSession {
   const ensureSession = useCallback(async (): Promise<string> => {
     if (sessionId) return sessionId;
     if (inflight.current) return inflight.current;
-    const promise = api.sessions
+    let promise: Promise<string>;
+    promise = api.sessions
       .create({})
       .then((row) => {
+        // If clearSession nulled inflight while we were awaiting, abandon
+        // the result — caller's stream-open will reject and be ignored.
+        if (inflight.current !== promise) {
+          throw new Error("session creation superseded");
+        }
         setSessionId(row.id);
         return row.id;
       })
       .finally(() => {
-        inflight.current = null;
+        if (inflight.current === promise) inflight.current = null;
       });
     inflight.current = promise;
     return promise;
   }, [api, sessionId]);
 
-  return { sessionId, ensureSession };
+  const clearSession = useCallback(() => {
+    inflight.current = null;
+    setSessionId(null);
+  }, []);
+
+  return { sessionId, ensureSession, clearSession };
 }
