@@ -1,0 +1,28 @@
+# Copied to /etc/caddy/Caddyfile on the VPS.
+# Replace me.example.com with the real hostname before the first deploy.
+
+me.example.com {
+    encode zstd gzip
+
+    reverse_proxy 127.0.0.1:8000 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    request_body {
+        max_size 20MB
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options    "nosniff"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/me.access.log
+        format console
+    }
+}

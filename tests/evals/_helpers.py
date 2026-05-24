@@ -22,7 +22,7 @@ EVAL_YESTERDAY_DATE = "2026-05-08"
 EVAL_TZ = "America/New_York"
 
 
-async def run_chat(
+def run_chat(
     *,
     message: str,
     db: Any,
@@ -32,17 +32,16 @@ async def run_chat(
     client_tz: str = EVAL_TZ,
 ) -> list[Any]:
     """Drive the agent and return every packet it emits, in order."""
-    packets: list[Any] = []
-    async for p in run_agent_stream(
-        message,
-        db=db,
-        memory_client=memory_client,
-        user=user,
-        now_utc=now_utc,
-        client_tz=client_tz,
-    ):
-        packets.append(p)
-    return packets
+    return list(
+        run_agent_stream(
+            message,
+            db=db,
+            memory_client=memory_client,
+            user=user,
+            now_utc=now_utc,
+            client_tz=client_tz,
+        )
+    )
 
 
 def tool_call_names(packets: list[Any]) -> list[str]:

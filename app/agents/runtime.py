@@ -1,19 +1,25 @@
-import asyncio
-import logging
-from collections.abc import AsyncIterator, Sequence
-from typing import Any
+"""Sync agent runtime.
 
-from agents import Agent, FunctionTool, Runner
-from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
-from agents.tool_context import ToolContext
-from openai import AsyncOpenAI
+Drives OpenAI chat-completions streaming and a manual tool-calling loop. Yields
+framework `Packet`s as they're produced — text deltas mid-stream, and tool
+start/call/end triples between stream turns when the model requests a tool.
+
+The chat layer wraps these into SSE frames and stamps the `step` field; this
+file is concerned only with the agent loop itself."""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import Generator, Iterator, Sequence
+from typing import Any, Final
+
+from openai import OpenAI
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.agents.context import AgentContext
-from app.agents.emitter import Emitter
 from app.agents.instructions import render_system_prompt
-from app.agents.packets import ErrorPacket
-from app.agents.sse import translate_framework
+from app.agents.packets import ErrorPacket, TextDeltaPacket
 from app.agents.tools import ALL_TOOL_CLASSES, Packet
 from app.agents.tools._base import Tool
 from app.core.config import get_settings
@@ -22,77 +28,175 @@ from app.services.memory_client import MemoryClient
 from app.services.sessions import HistoryTurn
 
 log = logging.getLogger(__name__)
-_SENTINEL: Any = object()
+
+_MAX_TOOL_TURNS: Final[int] = 10
 
 
-def _adapt(tool: Tool) -> FunctionTool:
-    async def on_invoke_tool(
-        ctx: ToolContext[AgentContext],
-        args_json: str,
-    ) -> str:
-        args = tool.ARGS_MODEL.model_validate_json(args_json or "{}")
-        # ToolContext.tool_call_id is typed `str | <sentinel>`; the SDK sets it
-        # to a real str whenever this callback fires.
-        tool_call_id = ctx.tool_call_id if isinstance(ctx.tool_call_id, str) else ""
-        result = await tool.run(ctx.context, tool_call_id, args)
-        return result.model_dump_json()
-
-    return FunctionTool(
-        name=tool.NAME,
-        description=tool.DESCRIPTION,
-        params_json_schema=tool.ARGS_MODEL.model_json_schema(),
-        on_invoke_tool=on_invoke_tool,
-    )
+def _tool_spec(tool: Tool) -> dict[str, Any]:
+    return {
+        "type": "function",
+        "function": {
+            "name": tool.NAME,
+            "description": tool.DESCRIPTION,
+            "parameters": tool.ARGS_MODEL.model_json_schema(),
+        },
+    }
 
 
-def build_agent(
-    emitter: Emitter,
-    *,
-    now_utc: str,
-    client_tz: str,
-) -> Agent[AgentContext]:
-    settings = get_settings()
-    client = AsyncOpenAI(
-        api_key=settings.openrouter_api_key.get_secret_value(),
-        base_url="https://openrouter.ai/api/v1",
-    )
-    model = OpenAIChatCompletionsModel(
-        model=settings.openrouter_default_model,
-        openai_client=client,
-    )
-    tools = [cls(emitter=emitter) for cls in ALL_TOOL_CLASSES]
-    return Agent(
-        name="me-chat",
-        instructions=render_system_prompt(now_utc=now_utc, client_tz=client_tz),
-        model=model,
-        tools=[_adapt(t) for t in tools],
-    )
-
-
-def _build_input(
+def _build_messages(
     user_input: str,
     history: Sequence[HistoryTurn] | None,
-) -> Any:
-    """Either the bare user message (no history) or a chronological list of
-    `{role, content}` items with the user message appended last.
-
-    Return type is `Any` because the SDK's `Runner.run_streamed` accepts a
-    union of TypedDict shapes that we can't construct precisely without
-    coupling to internal SDK types.
-
-    Returning the bare string in the no-history case keeps the runtime
-    behaviour byte-identical to phase 12 for the smoke test, which passes
-    no history."""
-    if not history:
-        return user_input
-    items: list[dict[str, str]] = [
-        {"role": turn["role"], "content": turn["content"]} for turn in history
+    now_utc: str,
+    client_tz: str,
+) -> list[Any]:
+    """Return type is `list[Any]` because the SDK's `messages` parameter is a
+    union of role-discriminated TypedDicts we can't construct precisely
+    without coupling to internal SDK types."""
+    msgs: list[Any] = [
+        {
+            "role": "system",
+            "content": render_system_prompt(now_utc=now_utc, client_tz=client_tz),
+        }
     ]
-    items.append({"role": "user", "content": user_input})
-    return items
+    for turn in history or []:
+        msgs.append({"role": turn["role"], "content": turn["content"]})
+    msgs.append({"role": "user", "content": user_input})
+    return msgs
 
 
-async def run_agent_stream(
+class _PartialToolCall(BaseModel):
+    """Fragments of one tool call, accumulated across stream chunks.
+
+    The OpenAI stream delivers `delta.tool_calls[i]` as partial strings tagged
+    by `i`; we fold them into one record per index before dispatching."""
+
+    id: str = ""
+    name: str = ""
+    args: str = ""
+
+
+def _fold_tool_call_deltas(
+    by_idx: dict[int, _PartialToolCall],
+    deltas: Sequence[Any],
+) -> None:
+    """Merge one chunk's `delta.tool_calls` fragments into the running
+    per-index accumulator. The stream sends partial `id`, `name`, and
+    (chunked) `arguments` strings tagged by index; each is appended or
+    overwritten on the matching `_PartialToolCall`."""
+    for tc in deltas:
+        entry = by_idx.setdefault(tc.index, _PartialToolCall())
+        if tc.id:
+            entry.id = tc.id
+        fn = tc.function
+        if fn is None:
+            continue
+        if fn.name:
+            entry.name = fn.name
+        if fn.arguments:
+            entry.args += fn.arguments
+
+
+class _TurnResult(BaseModel):
+    """One model turn after streaming completes: the assistant's accumulated
+    text, any tool calls it wants to invoke next, and the reason streaming
+    stopped (`"stop"`, `"tool_calls"`, `"length"`, …)."""
+
+    text: str = ""
+    tool_calls: list[_PartialToolCall] = []
+    finish_reason: str | None = None
+
+
+def _stream_one_turn(
+    client: OpenAI,
+    model: str,
+    messages: list[Any],
+    tool_specs: Any,
+) -> Generator[Packet, None, _TurnResult]:
+    """Stream one chat-completion call to its natural end. Yields a
+    `TextDeltaPacket` per content fragment as it arrives; returns the folded
+    `_TurnResult` so the caller knows whether to run tools or stop."""
+    text_parts: list[str] = []
+    tool_calls_by_idx: dict[int, _PartialToolCall] = {}
+    finish_reason: str | None = None
+
+    with client.chat.completions.create(
+        model=model,
+        messages=messages,
+        tools=tool_specs,
+        stream=True,
+    ) as stream:
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            choice = chunk.choices[0]
+            delta = choice.delta
+            if delta.content:
+                text_parts.append(delta.content)
+                yield TextDeltaPacket(delta=delta.content)
+            if delta.tool_calls:
+                _fold_tool_call_deltas(tool_calls_by_idx, delta.tool_calls)
+            if choice.finish_reason:
+                finish_reason = choice.finish_reason
+
+    return _TurnResult(
+        text="".join(text_parts),
+        tool_calls=list(tool_calls_by_idx.values()),
+        finish_reason=finish_reason,
+    )
+
+
+def _assistant_message(turn: _TurnResult) -> dict[str, Any]:
+    """Render a `_TurnResult` as the OpenAI SDK's `role:"assistant"` message
+    shape, ready to append to the running `messages` list."""
+    msg: dict[str, Any] = {"role": "assistant"}
+    if turn.text:
+        msg["content"] = turn.text
+    if turn.tool_calls:
+        msg["tool_calls"] = [
+            {
+                "id": tc.id,
+                "type": "function",
+                "function": {"name": tc.name, "arguments": tc.args},
+            }
+            for tc in turn.tool_calls
+        ]
+    return msg
+
+
+def _run_one_tool(
+    tc: _PartialToolCall,
+    tools_by_name: dict[str, Tool],
+    ctx: AgentContext,
+    messages: list[Any],
+) -> Iterator[Packet]:
+    """Validate args, emit lifecycle packets, execute, append tool result to
+    the running message list. Tool exceptions emit an `error`-status end
+    packet then re-raise so the outer driver can surface a framework
+    `ErrorPacket`."""
+    tool = tools_by_name[tc.name]
+    args = tool.ARGS_MODEL.model_validate_json(tc.args or "{}")
+    yield tool.START_PACKET(tool_call_id=tc.id)
+    yield tool.CALL_PACKET(tool_call_id=tc.id, arguments=args)
+    try:
+        result = tool.run(ctx, tc.id, args)
+    except Exception as exc:
+        yield tool.END_PACKET(
+            tool_call_id=tc.id,
+            status="error",
+            error=type(exc).__name__,
+        )
+        raise
+    yield tool.END_PACKET(tool_call_id=tc.id, status="ok", result=result)
+    messages.append(
+        {
+            "role": "tool",
+            "tool_call_id": tc.id,
+            "content": result.model_dump_json(),
+        }
+    )
+
+
+def run_agent_stream(
     user_input: str,
     db: Session,
     memory_client: MemoryClient,
@@ -101,32 +205,41 @@ async def run_agent_stream(
     now_utc: str,
     client_tz: str,
     history: Sequence[HistoryTurn] | None = None,
-) -> AsyncIterator[Packet]:
-    queue: asyncio.Queue = asyncio.Queue()
-    emitter = Emitter(queue, asyncio.get_running_loop())
-    agent = build_agent(emitter, now_utc=now_utc, client_tz=client_tz)
-    ctx = AgentContext(db=db, memory_client=memory_client, user=user, emitter=emitter)
-    agent_input = _build_input(user_input, history)
+) -> Iterator[Packet]:
+    """Drive the chat-completions loop end-to-end.
 
-    async def drive() -> None:
-        try:
-            result = Runner.run_streamed(agent, input=agent_input, context=ctx)
-            async for sdk_event in result.stream_events():
-                for packet in translate_framework(sdk_event):
-                    emitter.emit(packet)
-        except Exception as exc:
-            log.exception("agent_stream_failed: %s", type(exc).__name__)
-            emitter.emit(ErrorPacket(code="agent_failed", message=type(exc).__name__))
-        finally:
-            emitter.emit(_SENTINEL)
+    Each iteration: stream one model turn (text deltas flow to the wire as
+    they arrive), append the assistant's reply to `messages`, then either
+    finish (no tool calls) or run the requested tools and loop. Capped at
+    `_MAX_TOOL_TURNS` re-entries.
 
-    task = asyncio.create_task(drive())
+    All exceptions are converted to a terminal `ErrorPacket` so the SSE layer
+    always observes a clean generator close."""
+    settings = get_settings()
+    client = OpenAI(
+        api_key=settings.openrouter_api_key.get_secret_value(),
+        base_url="https://openrouter.ai/api/v1",
+    )
+    tools_by_name: dict[str, Tool] = {cls.NAME: cls() for cls in ALL_TOOL_CLASSES}
+    tool_specs: Any = [_tool_spec(t) for t in tools_by_name.values()]
+    ctx = AgentContext(db=db, memory_client=memory_client, user=user)
+    messages = _build_messages(user_input, history, now_utc, client_tz)
+
     try:
-        while True:
-            packet = await queue.get()
-            if packet is _SENTINEL:
+        for _ in range(_MAX_TOOL_TURNS):
+            turn = yield from _stream_one_turn(
+                client, settings.openrouter_default_model, messages, tool_specs
+            )
+            messages.append(_assistant_message(turn))
+
+            if turn.finish_reason != "tool_calls" or not turn.tool_calls:
                 return
-            yield packet
-    finally:
-        if not task.done():
-            task.cancel()
+
+            for tc in turn.tool_calls:
+                yield from _run_one_tool(tc, tools_by_name, ctx, messages)
+
+        log.warning("agent.max_turns_exceeded")
+        yield ErrorPacket(code="agent_max_turns", message="tool loop exceeded cap")
+    except Exception as exc:
+        log.exception("agent_stream_failed: %s", type(exc).__name__)
+        yield ErrorPacket(code="agent_failed", message=type(exc).__name__)

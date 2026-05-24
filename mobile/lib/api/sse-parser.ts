@@ -33,11 +33,19 @@ export function splitSseBlocks(
   chunk: string,
   leftover: string,
 ): { events: SseEvent[]; leftover: string } {
-  // SSE spec allows any of LF, CRLF, or lone CR as line terminators. The
-  // server (sse-starlette over uvicorn) emits CRLF, so without normalization
-  // the `\n\n` block separator is never found and every event sits in the
-  // leftover until EOF — the stream appears to "hang" client-side.
-  const buffer = (leftover + chunk).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  // sse-starlette emits CRLF; we normalize CRLF → LF so the `\n\n` block
+  // separator search works regardless of how the network slices chunks
+  // (TCP can split anywhere, including between the CR and LF of a single
+  // line ending).
+  //
+  // We intentionally do NOT also normalize a lone CR. A trailing CR at the
+  // tail of `leftover + chunk` is almost certainly the first half of a CRLF
+  // whose LF lives in the next chunk; converting it eagerly to LF would
+  // manufacture a phantom `\n\n` block separator the moment the next chunk's
+  // LF arrives, splitting a single block in two and dropping both halves at
+  // `parseBlock` (each has only one of event:/data:). Bare-CR SSE (classic-
+  // Mac line endings) is therefore not supported.
+  const buffer = (leftover + chunk).replace(/\r\n/g, "\n");
   const events: SseEvent[] = [];
 
   let cursor = 0;
