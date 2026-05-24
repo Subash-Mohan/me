@@ -1,18 +1,14 @@
-"""Chat endpoint — async-streaming SSE wrapping `run_agent_stream`.
-
-This is the project's only async route. Sync-route discipline is suspended
-here because the OpenAI Agents SDK streams from an async iterator; sync
-alternatives (threads + queues) trade readability for no benefit.
+"""Chat endpoint — sync route over SSE.
 
 Stream-folding state, packet framing, and end-of-stream persistence live in
 `app/api/_chat_stream.py`. This file is purely HTTP/DI orchestration:
 resolve session, record the user turn, decide replay-vs-fresh, hand the
 inputs to a streaming function. Framing on the wire is delegated to
 `sse_starlette.EventSourceResponse` (keep-alive pings, disconnect detection,
-buffering-disabled header for free).
+buffering-disabled header for free; sync iterables are wrapped via
+Starlette's threadpool internally).
 """
 
-import asyncio
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -43,7 +39,7 @@ log = structlog.get_logger(__name__)
 
 
 @router.post("")
-async def chat(
+def chat(
     body: ChatRequest,
     user: Annotated[User, Depends(current_user)],
     db: Annotated[DbSession, Depends(get_db)],
@@ -60,15 +56,12 @@ async def chat(
     )
 
     try:
-        session = await asyncio.to_thread(
-            get_session, db, user_id=user.id, session_id=body.session_id
-        )
+        session = get_session(db, user_id=user.id, session_id=body.session_id)
     except SessionNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "session not found") from exc
 
     loc = body.client_location
-    await asyncio.to_thread(
-        record_user_message,
+    record_user_message(
         db,
         user_id=user.id,
         session=session,
@@ -79,11 +72,7 @@ async def chat(
         location_lng=loc.lng if loc is not None else None,
     )
 
-    cached = await asyncio.to_thread(
-        find_assistant_for_user_message,
-        db,
-        user_message_id=body.client_message_id,
-    )
+    cached = find_assistant_for_user_message(db, user_message_id=body.client_message_id)
 
     if cached is not None:
         log.info(
@@ -93,8 +82,7 @@ async def chat(
         )
         return EventSourceResponse(replay_stream(cached))
 
-    history = await asyncio.to_thread(
-        load_recent_history,
+    history = load_recent_history(
         db,
         session_id=body.session_id,
         exclude_message_id=body.client_message_id,

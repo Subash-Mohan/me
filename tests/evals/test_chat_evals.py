@@ -45,11 +45,10 @@ def owner_id() -> UUID:
 # ─── greetings: no tool call ───────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_plain_greeting_emits_no_tool_call(db, owner_id):
+def test_plain_greeting_emits_no_tool_call(db, owner_id):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(message="hi", db=db, memory_client=fake, user=user)
+    pkts = run_chat(message="hi", db=db, memory_client=fake, user=user)
 
     assert tool_call_names(pkts) == []
     assert len(final_text(pkts)) > 0
@@ -58,11 +57,10 @@ async def test_plain_greeting_emits_no_tool_call(db, owner_id):
 # ─── create: time / tz / location ──────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_create_resolves_last_night_to_yesterday(db, owner_id):
+def test_create_resolves_last_night_to_yesterday(db, owner_id):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="I had pizza at Joe's in Brooklyn last night around 8pm.",
         db=db,
         memory_client=fake,
@@ -78,11 +76,10 @@ async def test_create_resolves_last_night_to_yesterday(db, owner_id):
     assert args["event_time"].startswith("20:")
 
 
-@pytest.mark.asyncio
-async def test_create_uses_iana_tz_not_abbreviation(db, owner_id):
+def test_create_uses_iana_tz_not_abbreviation(db, owner_id):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="Had coffee at 9am EST today.",
         db=db,
         memory_client=fake,
@@ -96,11 +93,10 @@ async def test_create_uses_iana_tz_not_abbreviation(db, owner_id):
     assert tz != "EST"
 
 
-@pytest.mark.asyncio
-async def test_create_does_not_hallucinate_lat_lng_from_place_name(db, owner_id):
+def test_create_does_not_hallucinate_lat_lng_from_place_name(db, owner_id):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="This morning I went for a run in Central Park.",
         db=db,
         memory_client=fake,
@@ -115,11 +111,10 @@ async def test_create_does_not_hallucinate_lat_lng_from_place_name(db, owner_id)
     assert "central park" in args["location_label"].lower()
 
 
-@pytest.mark.asyncio
-async def test_create_today_uses_correct_date(db, owner_id):
+def test_create_today_uses_correct_date(db, owner_id):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="I had a stand-up meeting this morning at 10.",
         db=db,
         memory_client=fake,
@@ -134,11 +129,10 @@ async def test_create_today_uses_correct_date(db, owner_id):
 # ─── recall must search first ──────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_recall_question_calls_search_first(db, owner_id):
+def test_recall_question_calls_search_first(db, owner_id):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="What did I eat yesterday?",
         db=db,
         memory_client=fake,
@@ -149,12 +143,11 @@ async def test_recall_question_calls_search_first(db, owner_id):
     assert names and names[0] == "search_memories"
 
 
-@pytest.mark.asyncio
-async def test_summarize_today_calls_search(db, owner_id):
+def test_summarize_today_calls_search(db, owner_id):
     """Regression: previously the model claimed 'no memories' without searching."""
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="Summarize my day so far.",
         db=db,
         memory_client=fake,
@@ -164,11 +157,10 @@ async def test_summarize_today_calls_search(db, owner_id):
     assert "search_memories" in tool_call_names(pkts)
 
 
-@pytest.mark.asyncio
-async def test_zero_hit_search_does_not_hallucinate(db, owner_id):
+def test_zero_hit_search_does_not_hallucinate(db, owner_id):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()  # no seeded memories, no search results
-    pkts = await run_chat(
+    pkts = run_chat(
         message="Do I have any memories about scuba diving?",
         db=db,
         memory_client=fake,
@@ -184,8 +176,7 @@ async def test_zero_hit_search_does_not_hallucinate(db, owner_id):
 # ─── update / delete must search first ─────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_update_searches_first_and_uses_correct_memory_id(db, owner_id):
+def test_update_searches_first_and_uses_correct_memory_id(db, owner_id):
     user = db.get(User, owner_id)
 
     mid = seed_memory(
@@ -199,7 +190,7 @@ async def test_update_searches_first_and_uses_correct_memory_id(db, owner_id):
         [ClientSearchHit(doc_id=str(mid), similarity=0.9)],
     )
 
-    pkts = await run_chat(
+    pkts = run_chat(
         message="Actually it was 9pm not 8 for the pizza last night.",
         db=db,
         memory_client=fake,
@@ -221,11 +212,10 @@ async def test_update_searches_first_and_uses_correct_memory_id(db, owner_id):
 # ─── multi-event in one turn ───────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_two_events_in_one_message_create_two_memories(db, owner_id):
+def test_two_events_in_one_message_create_two_memories(db, owner_id):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message=(
             "This morning I went for a run in Central Park, and at noon I had lunch at Sweetgreen."
         ),
@@ -248,11 +238,10 @@ async def test_two_events_in_one_message_create_two_memories(db, owner_id):
 # ─── Format compliance (cheap canary on all arg shapes) ───────────────────
 
 
-@pytest.mark.asyncio
-async def test_create_args_match_canonical_formats(db, owner_id):
+def test_create_args_match_canonical_formats(db, owner_id):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="I had coffee this morning at 8:30am.",
         db=db,
         memory_client=fake,
@@ -271,15 +260,14 @@ async def test_create_args_match_canonical_formats(db, owner_id):
 # ─── Time edge cases ──────────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_relative_weekday_resolves_to_recent_past(db, owner_id):
+def test_relative_weekday_resolves_to_recent_past(db, owner_id):
     """EVAL_NOW = Sat 2026-05-09. 'Last Tuesday' resolves to either the
     Tuesday of this week (2026-05-05) or the previous week (2026-04-28).
     Both are defensible English readings; reject only clear hallucinations.
     """
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="I went hiking last Tuesday.",
         db=db,
         memory_client=fake,
@@ -290,15 +278,14 @@ async def test_relative_weekday_resolves_to_recent_past(db, owner_id):
     assert args["event_date"] in ("2026-05-05", "2026-04-28"), args["event_date"]
 
 
-@pytest.mark.asyncio
-async def test_around_midnight_picks_one_definite_date(db, owner_id):
+def test_around_midnight_picks_one_definite_date(db, owner_id):
     """'Around midnight last night' is genuinely ambiguous (Fri-late vs
     Sat-early). Either is acceptable; what's NOT is no event_date or a
     far-off date.
     """
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="Got home around midnight last night.",
         db=db,
         memory_client=fake,
@@ -308,15 +295,14 @@ async def test_around_midnight_picks_one_definite_date(db, owner_id):
     assert args["event_date"] in ("2026-05-08", "2026-05-09"), args["event_date"]
 
 
-@pytest.mark.asyncio
-async def test_future_event_uses_tomorrow_date(db, owner_id):
+def test_future_event_uses_tomorrow_date(db, owner_id):
     """Future-dated 'memories' are technically allowed (think reminders).
     If the model creates one, the date must be tomorrow, not 'today' or some
     hallucinated value.
     """
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="I have a dentist appointment tomorrow at 10am.",
         db=db,
         memory_client=fake,
@@ -327,12 +313,11 @@ async def test_future_event_uses_tomorrow_date(db, owner_id):
         assert args[0]["event_date"] == "2026-05-10"
 
 
-@pytest.mark.asyncio
-async def test_user_named_tz_overrides_client_tz(db, owner_id):
+def test_user_named_tz_overrides_client_tz(db, owner_id):
     """The user explicitly says they're in Tokyo. Override client_tz."""
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="I'm visiting Tokyo this week. Just had sushi at 7pm.",
         db=db,
         memory_client=fake,
@@ -346,14 +331,13 @@ async def test_user_named_tz_overrides_client_tz(db, owner_id):
 # ─── Negative tool selection (no tool when not needed) ────────────────────
 
 
-@pytest.mark.asyncio
-async def test_general_knowledge_question_does_not_call_search(db, owner_id):
+def test_general_knowledge_question_does_not_call_search(db, owner_id):
     """Pure cooking-recipe question — about the world, not the user's past.
     The agent may either answer or politely redirect; either way, NO tool.
     """
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="How do I cook spaghetti carbonara?",
         db=db,
         memory_client=fake,
@@ -363,12 +347,11 @@ async def test_general_knowledge_question_does_not_call_search(db, owner_id):
     assert len(final_text(pkts)) > 20
 
 
-@pytest.mark.asyncio
-async def test_meta_question_does_not_call_tool(db, owner_id):
+def test_meta_question_does_not_call_tool(db, owner_id):
     """User asks what the agent can do — pure conversational reply, no tool."""
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="What can you help me with?",
         db=db,
         memory_client=fake,
@@ -380,8 +363,7 @@ async def test_meta_question_does_not_call_tool(db, owner_id):
 # ─── Error path handling ──────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_update_error_emits_typed_error_packets(db, owner_id, monkeypatch):
+def test_update_error_emits_typed_error_packets(db, owner_id, monkeypatch):
     """Tool errors re-raise out of `Tool.run` (per phase 06-07 design); the
     SDK runner halts and `runtime.drive` catches that into a framework
     `ErrorPacket`. The user does NOT get a graceful text reply — that's a
@@ -407,7 +389,7 @@ async def test_update_error_emits_typed_error_packets(db, owner_id, monkeypatch)
 
     monkeypatch.setattr(memory_service, "update_memory", boom)
 
-    pkts = await run_chat(
+    pkts = run_chat(
         message="Actually it was 9pm not 8 for the pizza last night.",
         db=db,
         memory_client=fake,
@@ -423,8 +405,7 @@ async def test_update_error_emits_typed_error_packets(db, owner_id, monkeypatch)
     assert error_packets[0].code == "agent_failed"
 
 
-@pytest.mark.asyncio
-async def test_local_fallback_search_still_returns_hits(db, owner_id):
+def test_local_fallback_search_still_returns_hits(db, owner_id):
     """Supermemory transient → service falls back to local FTS.
     Agent should treat the result transparently and use it in the answer.
     """
@@ -438,7 +419,7 @@ async def test_local_fallback_search_still_returns_hits(db, owner_id):
     fake = FakeMemoryClient()
     fake.fail_next("search", error=MemoryClientTransientError("force fallback"))
 
-    pkts = await run_chat(
+    pkts = run_chat(
         message="Any pizza memories?",
         db=db,
         memory_client=fake,
@@ -458,11 +439,10 @@ async def test_local_fallback_search_still_returns_hits(db, owner_id):
 
 
 @pytest.mark.parametrize("attempt", range(3))
-@pytest.mark.asyncio
-async def test_repeats_create_resolves_last_night(db, owner_id, attempt):
+def test_repeats_create_resolves_last_night(db, owner_id, attempt):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="I had pizza at Joe's in Brooklyn last night around 8pm.",
         db=db,
         memory_client=fake,
@@ -475,11 +455,10 @@ async def test_repeats_create_resolves_last_night(db, owner_id, attempt):
 
 
 @pytest.mark.parametrize("attempt", range(3))
-@pytest.mark.asyncio
-async def test_repeats_recall_calls_search_first(db, owner_id, attempt):
+def test_repeats_recall_calls_search_first(db, owner_id, attempt):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    pkts = await run_chat(
+    pkts = run_chat(
         message="What did I do this week?",
         db=db,
         memory_client=fake,
@@ -490,8 +469,7 @@ async def test_repeats_recall_calls_search_first(db, owner_id, attempt):
 
 
 @pytest.mark.parametrize("attempt", range(3))
-@pytest.mark.asyncio
-async def test_repeats_update_does_not_re_pass_text(db, owner_id, attempt):
+def test_repeats_update_does_not_re_pass_text(db, owner_id, attempt):
     user = db.get(User, owner_id)
     mid = seed_memory(
         user_id=owner_id,
@@ -501,7 +479,7 @@ async def test_repeats_update_does_not_re_pass_text(db, owner_id, attempt):
     fake = FakeMemoryClient()
     fake.set_search_results([ClientSearchHit(doc_id=str(mid), similarity=0.9)])
 
-    pkts = await run_chat(
+    pkts = run_chat(
         message="Actually it was 9pm not 8 for the pizza last night.",
         db=db,
         memory_client=fake,

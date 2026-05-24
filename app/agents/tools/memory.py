@@ -1,4 +1,3 @@
-import asyncio
 import re
 from datetime import date, time
 from typing import Any, ClassVar, Literal
@@ -58,27 +57,20 @@ class SearchMemoriesTool(Tool[SearchMemoriesArgs, SearchMemoriesResult]):
     CALL_PACKET = SearchMemoriesCallPacket
     END_PACKET = SearchMemoriesEndPacket
 
-    async def run(
+    def run(
         self,
         ctx: AgentContext,
         tool_call_id: str,
         args: SearchMemoriesArgs,
     ) -> SearchMemoriesResult:
-        self.emit_start(tool_call_id)
-        self.emit_call(tool_call_id, args)
-        try:
-            search = await asyncio.to_thread(
-                memory_service.search_memories,
-                ctx.db,
-                ctx.memory_client,
-                user_id=ctx.user.id,
-                q=args.q,
-                limit=args.limit,
-            )
-        except Exception as exc:
-            self.emit_end_error(tool_call_id, type(exc).__name__)
-            raise
-        result = SearchMemoriesResult(
+        search = memory_service.search_memories(
+            ctx.db,
+            ctx.memory_client,
+            user_id=ctx.user.id,
+            q=args.q,
+            limit=args.limit,
+        )
+        return SearchMemoriesResult(
             source=search.source,
             hits=[
                 SearchHit(
@@ -90,8 +82,6 @@ class SearchMemoriesTool(Tool[SearchMemoriesArgs, SearchMemoriesResult]):
                 for memory, similarity in search.hits
             ],
         )
-        self.emit_end_ok(tool_call_id, result)
-        return result
 
 
 # ─── manage_memory ─────────────────────────────────────────────────────────
@@ -238,7 +228,7 @@ class ManageMemoryTool(Tool[ManageMemoryArgs, MemoryDetailResult]):
     CALL_PACKET = ManageMemoryCallPacket
     END_PACKET = ManageMemoryEndPacket
 
-    async def run(
+    def run(
         self,
         ctx: AgentContext,
         tool_call_id: str,
@@ -246,43 +236,31 @@ class ManageMemoryTool(Tool[ManageMemoryArgs, MemoryDetailResult]):
     ) -> MemoryDetailResult:
         from app.schemas.memory import MemoryDetail
 
-        self.emit_start(tool_call_id)
-        self.emit_call(tool_call_id, args)
-        try:
-            if args.action == "create":
-                # The model_validator enforces these at runtime; asserts narrow
-                # for the type checker.
-                assert args.text is not None
-                assert args.event_date is not None
-                assert args.event_tz is not None
-                row = await asyncio.to_thread(
-                    memory_service.create_memory,
-                    ctx.db,
-                    ctx.memory_client,
-                    user_id=ctx.user.id,
-                    text=args.text,
-                    event_date=args.event_date,
-                    event_tz=args.event_tz,
-                    event_time=args.event_time,
-                    location_lat=args.location_lat,
-                    location_lng=args.location_lng,
-                    location_label=args.location_label,
-                    idempotency_id=args.idempotency_id,
-                )
-            else:  # update
-                assert args.memory_id is not None
-                row = await asyncio.to_thread(
-                    memory_service.update_memory,
-                    ctx.db,
-                    ctx.memory_client,
-                    user_id=ctx.user.id,
-                    memory_id=args.memory_id,
-                    **_unset_unprovided(args),
-                )
-            detail = MemoryDetail.model_validate(row, from_attributes=True)
-            result = MemoryDetailResult(memory=detail.model_dump(mode="json"))
-        except Exception as exc:
-            self.emit_end_error(tool_call_id, type(exc).__name__)
-            raise
-        self.emit_end_ok(tool_call_id, result)
-        return result
+        if args.action == "create":
+            assert args.text is not None
+            assert args.event_date is not None
+            assert args.event_tz is not None
+            row = memory_service.create_memory(
+                ctx.db,
+                ctx.memory_client,
+                user_id=ctx.user.id,
+                text=args.text,
+                event_date=args.event_date,
+                event_tz=args.event_tz,
+                event_time=args.event_time,
+                location_lat=args.location_lat,
+                location_lng=args.location_lng,
+                location_label=args.location_label,
+                idempotency_id=args.idempotency_id,
+            )
+        else:
+            assert args.memory_id is not None
+            row = memory_service.update_memory(
+                ctx.db,
+                ctx.memory_client,
+                user_id=ctx.user.id,
+                memory_id=args.memory_id,
+                **_unset_unprovided(args),
+            )
+        detail = MemoryDetail.model_validate(row, from_attributes=True)
+        return MemoryDetailResult(memory=detail.model_dump(mode="json"))

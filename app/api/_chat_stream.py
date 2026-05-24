@@ -23,13 +23,13 @@ Generators yield dicts shaped for `sse_starlette.EventSourceResponse`:
 `{"event": <packet type>, "data": <json string>}`.
 """
 
-import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID, uuid4
 
 import structlog
+from pydantic import TypeAdapter
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
@@ -48,11 +48,13 @@ from app.models.message import Message
 from app.models.session import Session
 from app.models.user import User
 from app.schemas.chat import ChatRequest
-from app.schemas.sessions import TextEvent, ToolEvent
+from app.schemas.sessions import Event, TextEvent, ToolEvent
 from app.services.memory_client import MemoryClient
 from app.services.sessions import HistoryTurn, record_assistant_message
 
 log = structlog.get_logger(__name__)
+
+_EVENT_LIST_ADAPTER: TypeAdapter[list[Event]] = TypeAdapter(list[Event])
 
 
 class StepAssigner:
@@ -179,42 +181,41 @@ class ChatTurn:
     now_utc: str
 
 
-async def replay_stream(cached: Message) -> AsyncIterator[dict[str, str]]:
+def replay_stream(cached: Message) -> Iterator[dict[str, str]]:
     """Rehydrate a persisted assistant turn into the same packet shape as
     the live stream. Walks `cached.events` in step order and emits the
     matching `text_delta` or tool start/call/end packets, then `finish`."""
     yield _sse(StartPacket(assistant_message_id=cached.id, session_id=cached.session_id))
-    for event in cached.events or []:
-        if event.get("kind") == "text":
-            yield _sse(TextDeltaPacket(step=event["step"], delta=event["content"]))
-            continue
-
-        tool_cls = TOOL_CLASS_BY_NAME[event["tool"]]
-        tcid = event["tool_call_id"]
-        step = event["step"]
-        yield _sse(tool_cls.START_PACKET(step=step, tool_call_id=tcid))
-        if event.get("arguments") is not None:
-            yield _sse(
-                tool_cls.CALL_PACKET(
-                    step=step,
-                    tool_call_id=tcid,
-                    arguments=tool_cls.ARGS_MODEL.model_validate(event["arguments"]),
-                )
-            )
-        if event.get("status") is not None:
-            yield _sse(
-                tool_cls.END_PACKET(
-                    step=step,
-                    tool_call_id=tcid,
-                    status=event["status"],
-                    result=event.get("result"),
-                    error=event.get("error"),
-                )
-            )
+    events = _EVENT_LIST_ADAPTER.validate_python(cached.events or [])
+    for event in events:
+        match event:
+            case TextEvent():
+                yield _sse(TextDeltaPacket(step=event.step, delta=event.content))
+            case ToolEvent():
+                tool_cls = TOOL_CLASS_BY_NAME[event.tool]
+                yield _sse(tool_cls.START_PACKET(step=event.step, tool_call_id=event.tool_call_id))
+                if event.arguments is not None:
+                    yield _sse(
+                        tool_cls.CALL_PACKET(
+                            step=event.step,
+                            tool_call_id=event.tool_call_id,
+                            arguments=tool_cls.ARGS_MODEL.model_validate(event.arguments),
+                        )
+                    )
+                if event.status is not None:
+                    yield _sse(
+                        tool_cls.END_PACKET(
+                            step=event.step,
+                            tool_call_id=event.tool_call_id,
+                            status=event.status,
+                            result=event.result,
+                            error=event.error,
+                        )
+                    )
     yield _sse(FinishPacket(reason="stop", assistant_message_id=cached.id))
 
 
-async def stream_turn(turn: ChatTurn) -> AsyncIterator[dict[str, str]]:
+def stream_turn(turn: ChatTurn) -> Iterator[dict[str, str]]:
     """Run the agent for one turn, framed by `start` and `finish` packets.
 
     The assistant message id is allocated up front and advertised in `start`,
@@ -230,7 +231,7 @@ async def stream_turn(turn: ChatTurn) -> AsyncIterator[dict[str, str]]:
 
     assigner = StepAssigner()
     state = StreamState()
-    async for packet in run_agent_stream(
+    for packet in run_agent_stream(
         turn.body.message,
         db=turn.db,
         memory_client=turn.memory_client,
@@ -260,8 +261,7 @@ async def stream_turn(turn: ChatTurn) -> AsyncIterator[dict[str, str]]:
         return
 
     try:
-        await asyncio.to_thread(
-            record_assistant_message,
+        record_assistant_message(
             turn.db,
             user_id=turn.user.id,
             session=turn.session,

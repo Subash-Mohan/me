@@ -7,7 +7,7 @@ dependencies = [
     "alembic>=1.13",
     "argon2-cffi>=23.1",
     "fastapi",
-    "openai-agents>=0.17",
+    "openai>=2.36",
     "psycopg[binary]>=3.1",
     "pydantic-settings>=2.0",
     "pyjwt>=2.8",
@@ -25,7 +25,6 @@ dev = [
     "ty",
     "pre-commit",
     "httpx>=0.28.1",
-    "pytest-asyncio>=1.1",
     "pytest-httpx>=0.36.2",
 ]
 

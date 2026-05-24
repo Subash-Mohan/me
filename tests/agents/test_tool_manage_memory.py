@@ -1,9 +1,5 @@
-"""Integration tests for ManageMemoryTool.
-
-Phase-file draft assumed seed_owner/seed_memory return ORM rows; reality is
-UUIDs (same divergence as test_tool_search_memories). Tests adapted to the
-actual helper shapes and the keyword-only memory-service signatures.
-"""
+"""Integration tests for ManageMemoryTool — pure-compute `run()` returns a
+typed result. Lifecycle packets are emitted by the runtime, not the tool."""
 
 from datetime import date
 from uuid import UUID
@@ -27,21 +23,11 @@ def owner_id() -> UUID:
     return seed_owner("phrase for manage-memory tool tests")
 
 
-class _ListEmitter:
-    def __init__(self):
-        self.packets = []
-
-    def emit(self, p):
-        self.packets.append(p)
-
-
-@pytest.mark.asyncio
-async def test_create_emits_call_and_end_ok(db, owner_id):
+def test_create_returns_memory_detail(db, owner_id):
     user = db.get(User, owner_id)
     fake = FakeMemoryClient()
-    emitter = _ListEmitter()
-    ctx = AgentContext(db=db, memory_client=fake, user=user, emitter=emitter)
-    tool = ManageMemoryTool(emitter=emitter)
+    ctx = AgentContext(db=db, memory_client=fake, user=user)
+    tool = ManageMemoryTool()
 
     args = ManageMemoryArgs(
         action="create",
@@ -49,17 +35,11 @@ async def test_create_emits_call_and_end_ok(db, owner_id):
         event_date=date(2026, 5, 1),
         event_tz="America/New_York",
     )
-    result = await tool.run(ctx, "tc_1", args)
+    result = tool.run(ctx, "tc_1", args)
 
     assert isinstance(result, MemoryDetailResult)
     assert result.kind == "memory"
-    assert [p.type for p in emitter.packets] == [
-        "manage_memory_start",
-        "manage_memory_call",
-        "manage_memory_end",
-    ]
-    assert emitter.packets[0].tool_call_id == "tc_1"
-    assert emitter.packets[-1].status == "ok"
+    assert result.memory["text"] == "had pizza tuesday"
 
 
 def test_create_validation_rejects_missing_required_fields():

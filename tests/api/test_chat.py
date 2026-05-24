@@ -71,9 +71,8 @@ class _FakeRuntime:
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         self.calls.append({"args": args, "kwargs": kwargs})
 
-        async def gen() -> Any:
-            for packet in self.script_factory():
-                yield packet
+        def gen() -> Any:
+            yield from self.script_factory()
 
         return gen()
 
