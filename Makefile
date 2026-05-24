@@ -1,6 +1,7 @@
 COMPOSE := docker compose -f docker/docker-compose.yml
+COMPOSE_PROD := docker compose -f deploy/docker-compose.prod.yml
 
-.PHONY: up down logs psql migrate revision current dev mobile test test-db-create test-db-migrate test-db-reset lint format typecheck check
+.PHONY: up down logs psql migrate revision current dev mobile test test-db-create test-db-migrate test-db-reset lint format typecheck check prod-build prod-migrate prod-up prod-down prod-logs
 
 up:
 	$(COMPOSE) up -d
@@ -57,3 +58,18 @@ typecheck:
 	uv run ty check app
 
 check: lint typecheck test
+
+prod-build:
+	$(COMPOSE_PROD) build
+
+prod-migrate:
+	$(COMPOSE_PROD) run --rm api alembic upgrade head
+
+prod-up:
+	$(COMPOSE_PROD) up -d
+
+prod-down:
+	$(COMPOSE_PROD) down
+
+prod-logs:
+	$(COMPOSE_PROD) logs -f api

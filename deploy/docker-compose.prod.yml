@@ -1,0 +1,33 @@
+services:
+  api:
+    image: me-api:latest
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    pull_policy: never
+    container_name: me-api
+    restart: unless-stopped
+    env_file: ${ME_ENV_FILE:-/etc/me/env}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - me_images:/app/var/images
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request
+          try:
+              r = urllib.request.urlopen("http://localhost:8000/healthz", timeout=2)
+              sys.exit(0 if r.status == 200 else 1)
+          except Exception:
+              sys.exit(1)
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  me_images: {}

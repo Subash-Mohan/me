@@ -1,0 +1,51 @@
+.git/
+.gitignore
+
+# Virtualenvs and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+.ty_cache/
+.pytest_cache/
+.mypy_cache/
+
+# Build artefacts
+dist/
+build/
+*.egg-info/
+
+# Workspaces / clients we don't ship in the image
+mobile/
+node_modules/
+landing_page/
+package.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+# Runtime state and secrets
+var/
+.env
+.env.*
+
+# Test code and tooling not needed at runtime
+tests/
+
+# Docs and planning
+docs/
+Plans/
+*.md
+
+# Dev-only docker (we use deploy/ for prod)
+docker/
+deploy/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
