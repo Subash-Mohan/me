@@ -10,6 +10,7 @@ plus `step` assignment are owned by the chat layer and asserted directly here.
 from __future__ import annotations
 
 import json
+from datetime import date
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -26,10 +27,27 @@ from app.agents.tools.memory import (
 )
 from app.models.message import Message
 from app.models.session import Session as SessionModel
+from app.schemas.memory import MemoryAgentView
 from tests._db import reset_db, seed_owner
 from tests._memory import auth_headers, owner_id
 
 PHRASE = "chat-test-phrase-marble-canyon"
+
+
+def _fake_memory_view() -> MemoryAgentView:
+    """Minimal valid stub for tests that only care about packet plumbing,
+    not the memory content. Real values are produced by the memory service
+    in other tests."""
+    return MemoryAgentView(
+        id=uuid4(),
+        text="stub",
+        event_date=date(2026, 1, 1),
+        event_time=None,
+        event_tz="UTC",
+        location_lat=None,
+        location_lng=None,
+        location_label=None,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -188,8 +206,8 @@ def test_chat_steps_increment_across_text_tool_text_interleave(
 
     args1 = ManageMemoryArgs(action="update", memory_id=uuid4())
     args2 = ManageMemoryArgs(action="update", memory_id=uuid4())
-    result1 = MemoryDetailResult(memory={"id": "a"})
-    result2 = MemoryDetailResult(memory={"id": "b"})
+    result1 = MemoryDetailResult(memory=_fake_memory_view())
+    result2 = MemoryDetailResult(memory=_fake_memory_view())
 
     def script() -> list[Any]:
         return [
@@ -281,7 +299,7 @@ def test_chat_records_tool_event_on_assistant_row(
         action="update",
         memory_id=uuid4(),
     )
-    update_result = MemoryDetailResult(memory={"id": "x"})
+    update_result = MemoryDetailResult(memory=_fake_memory_view())
 
     def script() -> list[Any]:
         return [
@@ -377,7 +395,7 @@ def test_chat_replay_re_emits_tool_packets_with_persisted_step(
     client_message_id = uuid4()
 
     fake_args = ManageMemoryArgs(action="update", memory_id=uuid4())
-    update_result = MemoryDetailResult(memory={"id": "x"})
+    update_result = MemoryDetailResult(memory=_fake_memory_view())
 
     def script() -> list[Any]:
         return [

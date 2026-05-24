@@ -80,6 +80,28 @@ class MemoryDetail(BaseModel):
     updated_at: datetime
 
 
+class MemoryAgentView(BaseModel):
+    """Memory shape returned to the chat agent's tools.
+
+    Internal sync-state fields (`external_id`, `external_status`, …) are
+    deliberately excluded so the model never sees and accidentally substitutes
+    Supermemory's `document_id` for the local `Memory.id` on a follow-up
+    update. Timestamps are also omitted — the agent has no use for them and
+    they cost tokens.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    text: str
+    event_date: date
+    event_time: time | None
+    event_tz: str
+    location_lat: float | None
+    location_lng: float | None
+    location_label: str | None
+
+
 class MemoryCard(BaseModel):
     """Compact list-view representation. `text_preview` is the first ~200 chars."""
 

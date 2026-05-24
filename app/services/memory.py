@@ -501,10 +501,12 @@ def search_memories(
         return SearchResult(hits=[], source="supermemory")
 
     doc_ids = [h.doc_id for h in sm_hits]
-    # Supermemory's search response returns `document_id` = customId (= our
-    # Memory.id), while documents.add returns the internal id (stored as
-    # external_id). Hydrate by either: real-API hits match on id, fake-client
-    # tests still match on external_id.
+    # Supermemory's search response returns its internal `document_id`, which
+    # we persist as `Memory.external_id` after `documents.add`. The
+    # `Memory.id` branch of the OR is a tolerant fallback: it lets the fake
+    # client return either id form in tests, and absorbs a hypothetical
+    # future API revision that echoes `customId` instead of (or alongside)
+    # `document_id`.
     uuid_doc_ids: list[UUID] = []
     for d in doc_ids:
         with suppress(ValueError):

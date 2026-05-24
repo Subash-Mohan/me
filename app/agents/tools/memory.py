@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from app.agents.context import AgentContext
 from app.agents.packets import ToolCallPacket, ToolEndPacket, ToolStartPacket
 from app.agents.tools._base import Tool
+from app.schemas.memory import MemoryAgentView
 from app.services import memory as memory_service
 
 
@@ -175,7 +176,7 @@ class ManageMemoryArgs(BaseModel):
 
 class MemoryDetailResult(BaseModel):
     kind: Literal["memory"] = "memory"
-    memory: dict  # MemoryDetail.model_dump(mode="json")
+    memory: MemoryAgentView
 
 
 class ManageMemoryStartPacket(ToolStartPacket):
@@ -234,8 +235,6 @@ class ManageMemoryTool(Tool[ManageMemoryArgs, MemoryDetailResult]):
         tool_call_id: str,
         args: ManageMemoryArgs,
     ) -> MemoryDetailResult:
-        from app.schemas.memory import MemoryDetail
-
         if args.action == "create":
             assert args.text is not None
             assert args.event_date is not None
@@ -262,5 +261,4 @@ class ManageMemoryTool(Tool[ManageMemoryArgs, MemoryDetailResult]):
                 memory_id=args.memory_id,
                 **_unset_unprovided(args),
             )
-        detail = MemoryDetail.model_validate(row, from_attributes=True)
-        return MemoryDetailResult(memory=detail.model_dump(mode="json"))
+        return MemoryDetailResult(memory=MemoryAgentView.model_validate(row, from_attributes=True))

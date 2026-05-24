@@ -9,12 +9,13 @@ file is concerned only with the agent loop itself."""
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Generator, Iterator, Sequence
 from typing import Any, Final
 
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from app.agents.context import AgentContext
@@ -24,12 +25,32 @@ from app.agents.tools import ALL_TOOL_CLASSES, Packet
 from app.agents.tools._base import Tool
 from app.core.config import get_settings
 from app.models.user import User
+from app.services._memory_errors import (
+    MemoryDuplicate,
+    MemoryIdempotencyReused,
+    MemoryNotFound,
+    MemoryValidationError,
+)
 from app.services.memory_client import MemoryClient
 from app.services.sessions import HistoryTurn
 
 log = logging.getLogger(__name__)
 
 _MAX_TOOL_TURNS: Final[int] = 10
+
+# Errors the model can recover from by retrying with corrected arguments.
+# Pydantic ValidationError covers arg-schema misuse (e.g. `manage_memory`
+# update without `memory_id`); the typed memory errors cover service-layer
+# rejections (missing row, duplicate canonical text, bad TZ, etc.). These
+# never crash the stream — they become tool-error results so the next loop
+# turn lets the model self-correct.
+_MODEL_RECOVERABLE_TOOL_ERRORS: Final = (
+    ValidationError,
+    MemoryNotFound,
+    MemoryDuplicate,
+    MemoryValidationError,
+    MemoryIdempotencyReused,
+)
 
 
 def _tool_spec(tool: Tool) -> dict[str, Any]:
@@ -163,6 +184,32 @@ def _assistant_message(turn: _TurnResult) -> dict[str, Any]:
     return msg
 
 
+def _surface_tool_error(
+    tool: Tool,
+    tool_call_id: str,
+    messages: list[Any],
+    exc: BaseException,
+    *,
+    start_emitted: bool,
+) -> Iterator[Packet]:
+    """Convert a model-recoverable exception into a tool-error end packet plus
+    a `role:"tool"` message. The model sees the error verbatim on the next
+    loop turn and can retry (e.g. call `search_memories` to obtain the
+    `memory_id` it forgot)."""
+    error_label = f"{type(exc).__name__}: {exc}"
+    log.info("agent.tool_error_recovered", extra={"tool": tool.NAME, "error": error_label})
+    if not start_emitted:
+        yield tool.START_PACKET(tool_call_id=tool_call_id)
+    yield tool.END_PACKET(tool_call_id=tool_call_id, status="error", error=error_label)
+    messages.append(
+        {
+            "role": "tool",
+            "tool_call_id": tool_call_id,
+            "content": json.dumps({"error": error_label}),
+        }
+    )
+
+
 def _run_one_tool(
     tc: _PartialToolCall,
     tools_by_name: dict[str, Tool],
@@ -170,15 +217,24 @@ def _run_one_tool(
     messages: list[Any],
 ) -> Iterator[Packet]:
     """Validate args, emit lifecycle packets, execute, append tool result to
-    the running message list. Tool exceptions emit an `error`-status end
-    packet then re-raise so the outer driver can surface a framework
-    `ErrorPacket`."""
+    the running message list. Pydantic arg-validation errors and recoverable
+    service errors are surfaced as tool-error results so the loop continues;
+    other exceptions still propagate so the outer driver can surface a
+    framework `ErrorPacket`."""
     tool = tools_by_name[tc.name]
-    args = tool.ARGS_MODEL.model_validate_json(tc.args or "{}")
+    try:
+        args = tool.ARGS_MODEL.model_validate_json(tc.args or "{}")
+    except ValidationError as exc:
+        yield from _surface_tool_error(tool, tc.id, messages, exc, start_emitted=False)
+        return
+
     yield tool.START_PACKET(tool_call_id=tc.id)
     yield tool.CALL_PACKET(tool_call_id=tc.id, arguments=args)
     try:
         result = tool.run(ctx, tc.id, args)
+    except _MODEL_RECOVERABLE_TOOL_ERRORS as exc:
+        yield from _surface_tool_error(tool, tc.id, messages, exc, start_emitted=True)
+        return
     except Exception as exc:
         yield tool.END_PACKET(
             tool_call_id=tc.id,
