@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AsteroidField } from "@/components/chat/asteroid-field";
 import { ChatHeader } from "@/components/chat/chat-header";
@@ -34,7 +34,10 @@ export default function ChatScreen() {
   }
 
   return (
-    <View className="flex-1 bg-[#121212]">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1 bg-[#121212]"
+    >
       <LinearGradient
         colors={["#1f1f1f", "#141414", "#070707"]}
         locations={[0, 0.5, 1]}
@@ -54,6 +57,6 @@ export default function ChatScreen() {
         onNewSessionPress={chat.newSession}
       />
       <ChatInput onSend={handleSend} bottomInset={insets.bottom} />
-    </View>
+    </KeyboardAvoidingView>
   );
 }

@@ -2,12 +2,7 @@ import { BlurView } from "expo-blur";
 import * as ImagePicker from "expo-image-picker";
 import { Mic, Plus } from "lucide-react-native";
 import { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  TextInput,
-  View,
-} from "react-native";
+import { TextInput, View } from "react-native";
 import { ImagePreviewRow } from "@/components/chat/image-preview-row";
 import { IconButton } from "@/components/ui/icon-button";
 import { colors } from "@/theme";
@@ -47,9 +42,7 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={0}
+    <View
       pointerEvents="box-none"
       style={{
         position: "absolute",
@@ -119,6 +112,6 @@ export function ChatInput({ onSend, bottomInset = 0 }: Props) {
           </View>
         </BlurView>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
